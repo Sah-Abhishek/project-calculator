@@ -10,6 +10,7 @@ import BillingPage from "./pages/Billing";
 import ResourcesPage from "./pages/Resources";
 import MasterDatabase from "./pages/MasterDatabase";
 import Invoices from "./pages/Invoices";
+import SettingsPage from "./pages/Settings";
 
 const AppRoutes = () => {
   return (
@@ -21,10 +22,11 @@ const AppRoutes = () => {
         <Route path="/projects" element={<ProjectPage />} />
         <Route path="/productivity" element={<Productivity />} />
         <Route path="/billing" element={<BillingPage />} />
-        <Route path="/calculator" element={<Calculator />} />
+        <Route path="/" element={<Calculator />} />
         <Route path="/resources" element={<ResourcesPage />} />
         <Route path="/masterdatabase" element={<MasterDatabase />} />
         <Route path="/invoices" element={<Invoices />} />
+        <Route path="/settings" element={<SettingsPage />} />
       </Route>
 
       {/* Dashboard (after login) */}

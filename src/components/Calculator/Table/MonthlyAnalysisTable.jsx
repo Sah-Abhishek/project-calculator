@@ -21,17 +21,17 @@ const MonthlyAnalysisTable = ({ data }) => {
   const kpiCards = [
     {
       label: "Total Budget",
-      value: `₹${total_budget?.toLocaleString() || 0}`,
+      value: `$${total_budget?.toLocaleString() || 0}`,
       color: "bg-blue-100 text-blue-800 border-blue-300",
     },
     {
       label: "Billable Amount",
-      value: `₹${billable_amount?.toLocaleString() || 0}`,
+      value: `$${billable_amount?.toLocaleString() || 0}`,
       color: "bg-green-100 text-green-800 border-green-300",
     },
     {
       label: "Non-Billable Amount",
-      value: `₹${non_billable_amount?.toLocaleString() || 0}`,
+      value: `$${non_billable_amount?.toLocaleString() || 0}`,
       color: "bg-yellow-100 text-yellow-800 border-yellow-300",
     },
     {
@@ -75,13 +75,13 @@ const MonthlyAnalysisTable = ({ data }) => {
                 Project Name
               </th>
               <th className="px-4 py-2 text-center font-semibold text-gray-700 border-b">
-                Total Cost (₹)
+                Total Cost ($)
               </th>
               <th className="px-4 py-2 text-center font-semibold text-gray-700 border-b">
-                Billable (₹)
+                Billable ($)
               </th>
               <th className="px-4 py-2 text-center font-semibold text-gray-700 border-b">
-                Non-Billable (₹)
+                Non-Billable ($)
               </th>
               <th className="px-4 py-2 text-center font-semibold text-gray-700 border-b">
                 Resources
@@ -100,13 +100,13 @@ const MonthlyAnalysisTable = ({ data }) => {
                   {proj.project_name}
                 </td>
                 <td className="px-4 py-2 border-b text-center">
-                  ₹{proj.total_cost.toLocaleString()}
+                  ${proj.total_cost.toLocaleString()}
                 </td>
                 <td className="px-4 py-2 border-b text-center text-green-700">
-                  ₹{proj.billable_cost.toLocaleString()}
+                  ${proj.billable_cost.toLocaleString()}
                 </td>
                 <td className="px-4 py-2 border-b text-center text-yellow-700">
-                  ₹{proj.non_billable_cost.toLocaleString()}
+                  ${proj.non_billable_cost.toLocaleString()}
                 </td>
                 <td className="px-4 py-2 border-b text-center">
                   {proj.resource_count}

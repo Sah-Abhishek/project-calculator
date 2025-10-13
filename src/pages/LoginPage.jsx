@@ -17,7 +17,7 @@ const LoginPage = () => {
       console.log("This is the data: ", data);
       localStorage.setItem("token", data.token);
       localStorage.setItem("user", JSON.stringify(data.user));
-      navigate('/dashboard');
+      navigate('/');
 
 
     } catch (error) {
