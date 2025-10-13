@@ -1,7 +1,7 @@
 
 import React from "react";
 
-const HeaderSection = ({ heading, subheading }) => {
+const PageHeader = ({ heading, subHeading }) => {
   const user = JSON.parse(localStorage.getItem("user")) || {
     full_name: "Guest User",
     email: "guest@example.com",
@@ -17,11 +17,11 @@ const HeaderSection = ({ heading, subheading }) => {
     : "GU";
 
   return (
-    <div className="flex justify-between items-center px-8 py-4 bg-white">
+    <div className="flex justify-between items-center p-8 pb-4 bg-white">
       {/* Left side */}
       <div>
         <h1 className="text-2xl font-semibold text-gray-900">{heading}</h1>
-        <p className="text-sm text-gray-500">{subheading}</p>
+        <p className="text-sm text-gray-500">{subHeading}</p>
       </div>
 
       {/* Right side user info */}
@@ -38,4 +38,4 @@ const HeaderSection = ({ heading, subheading }) => {
   );
 };
 
-export default HeaderSection;
+export default PageHeader;
