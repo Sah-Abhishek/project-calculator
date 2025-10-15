@@ -1,4 +1,6 @@
 import React, { useState, useMemo, useEffect } from 'react';
+import { BsDownload } from "react-icons/bs";
+
 
 const apiBaseUrl = import.meta.env.VITE_BACKEND_URL;
 
@@ -164,44 +166,58 @@ const Invoices = () => {
     setFilters(prev => ({ ...prev, [name]: value }));
   };
 
-  const handleDownloadPdf = () => {
-    // NOTE: alert is used here as a placeholder for a custom UI modal, which is required per instructions.
-    if (!isPdfLibReady || !selectedInvoice) return alert("PDF not ready or no invoice selected.");
+  const handleDownloadPdfDirect = (invoice) => {
+    if (!isPdfLibReady || !invoice) {
+      console.error("PDF generation library not ready or no invoice provided.");
+      alert("PDF generation is not ready. Please wait a moment and try again.");
+      return;
+    }
 
     const { jsPDF } = window.jspdf;
     const doc = new jsPDF();
 
+    // Header
     doc.setFontSize(20);
-    doc.text(`Invoice: ${selectedInvoice.invoice_number}`, 14, 22);
+    doc.text(`Invoice: ${invoice.invoice_number}`, 14, 22);
 
-    const first = selectedInvoice.billing_records[0];
-    if (first) {
-      const period = `${new Date(0, first.month - 1).toLocaleString('default', { month: 'long' })} ${first.year}`;
+    const firstRecord = invoice.billing_records[0];
+    if (firstRecord) {
+      const monthYear = `${new Date(0, firstRecord.month - 1).toLocaleString('default', { month: 'long' })} ${firstRecord.year}`;
       doc.setFontSize(12);
-      doc.text(`For Period: ${period}`, 14, 30);
+      doc.text(`For Period: ${monthYear}`, 14, 30);
     }
-    doc.text(`Date Generated: ${formatDate(selectedInvoice.createdAt)}`, 14, 36);
+    doc.setFontSize(10);
+    doc.text(`Date Generated: ${formatDate(invoice.createdAt)}`, 14, 36);
 
-    const rows = getLookups(selectedInvoice);
+    // Table
+    const tableData = getLookups(invoice);
     const head = [['Project', 'Sub-Project', 'Resource', 'Hours', 'Rate', 'Total', 'Status']];
-    const body = rows.map(r => [
-      r.projectName,
-      r.subprojectName,
-      r.resourceName,
-      r.hours,
-      formatCurrency(r.rate),
-      formatCurrency(r.hours * r.rate),
-      r.billable_status
+    const body = tableData.map(row => [
+      row.projectName,
+      row.subprojectName,
+      row.resourceName,
+      row.hours,
+      formatCurrency(row.rate),
+      formatCurrency(row.hours * row.rate),
+      row.billable_status
     ]);
 
-    doc.autoTable({ startY: 45, head, body });
-    const finalY = doc.autoTable.previous.finalY;
+    doc.autoTable({ startY: 45, head: head, body: body });
 
+    // Summary
+    const finalY = doc.autoTable.previous.finalY;
     doc.setFontSize(14);
     doc.setFont('helvetica', 'bold');
-    doc.text(`Total Amount: ${formatCurrency(selectedInvoice.total_amount)}`, 14, finalY + 15);
+    doc.text(`Total Amount: ${formatCurrency(invoice.total_amount)}`, 14, finalY + 15);
 
-    doc.save(`Invoice-${selectedInvoice.invoice_number}.pdf`);
+    // Save
+    doc.save(`Invoice-${invoice.invoice_number}.pdf`);
+  };
+
+
+  // Keep this old one for the modal (calls the new one)
+  const handleDownloadPdf = () => {
+    handleDownloadPdfDirect(selectedInvoice);
   };
 
   // --- RENDER ---
@@ -289,7 +305,7 @@ const Invoices = () => {
               <thead className="bg-gray-50">
                 <tr>
                   {/* UPDATED HEADER ARRAY */}
-                  {['Invoice #', 'Billing Month', 'Amount', 'Billable Amount', 'Non-Billable Amount', 'Items', 'Created'].map(header => (
+                  {['Invoice #', 'Billing Month', 'Amount', 'Billable Amount', 'Non-Billable Amount', 'Items', 'Created', 'Actions'].map(header => (
                     <th key={header} className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{header}</th>
                   ))}
                 </tr>
@@ -311,6 +327,21 @@ const Invoices = () => {
                     <td className="px-6 py-4 text-sm text-red-700">{formatCurrency(invoice.total_non_billable_amount)}</td>
                     <td className="px-6 py-4 text-sm text-gray-500">{invoice.billing_records.length}</td>
                     <td className="px-6 py-4 text-sm text-gray-500">{formatDate(invoice.createdAt)}</td>
+                    <td className="px-6 py-4 whitespace-nowrap text-center">
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation(); // Prevent opening modal
+                          handleDownloadPdfDirect(invoice);
+                        }}
+                        disabled={!isPdfLibReady}
+                        className={`text-blue-600 hover:text-blue-800 transition ${!isPdfLibReady ? 'opacity-50 cursor-not-allowed' : ''
+                          }`}
+                        title="Download PDF"
+                      >
+                        <BsDownload size={18} />
+                      </button>
+                    </td>
+
                   </tr>
                 ))}
               </tbody>

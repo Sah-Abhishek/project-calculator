@@ -28,7 +28,7 @@ const SettingsPage = () => {
     try {
       setLoading(true);
 
-      const response = await axios.post(`${BASE_URL}/api/users/create`, {
+      const response = await axios.post(`${BASE_URL}/auth/register`, {
         email,
         password,
       });
@@ -129,8 +129,8 @@ const SettingsPage = () => {
           {message && (
             <div
               className={`text-sm rounded-md px-3 py-2 ${message.type === "success"
-                  ? "bg-green-100 text-green-700 border border-green-300"
-                  : "bg-red-100 text-red-700 border border-red-300"
+                ? "bg-green-100 text-green-700 border border-green-300"
+                : "bg-red-100 text-red-700 border border-red-300"
                 }`}
             >
               {message.text}
@@ -142,8 +142,8 @@ const SettingsPage = () => {
             type="submit"
             disabled={loading}
             className={`w-full py-2 px-4 flex justify-center items-center gap-2 text-white font-medium rounded-lg transition ${loading
-                ? "bg-blue-300 cursor-not-allowed"
-                : "bg-blue-600 hover:bg-blue-700"
+              ? "bg-blue-300 cursor-not-allowed"
+              : "bg-blue-600 hover:bg-blue-700"
               }`}
           >
             <UserPlusIcon className="h-5 w-5" />
