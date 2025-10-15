@@ -7,8 +7,8 @@ const MonthlyBudgetAnalysis = () => {
   const [selectedMonth, setSelectedMonth] = useState("");
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState("");
-  const apiUrl = import.meta.env.VITE_BACKEND_URL;
   const [tableData, setTableData] = useState({});
+  const apiUrl = import.meta.env.VITE_BACKEND_URL;
 
   const currentYear = new Date().getFullYear();
   const currentMonthIndex = new Date().getMonth(); // 0–11
@@ -28,42 +28,43 @@ const MonthlyBudgetAnalysis = () => {
     "December",
   ];
 
-  // Generate list of options dynamically
+  // Generate dropdown options dynamically
   const months = monthNames.map((month) =>
     month === "All Months" ? month : `${month} ${currentYear}`
   );
 
-  // 🧠 Set the default selected month when component mounts
+  // 🔹 Auto-set current month on mount
   useEffect(() => {
     const currentMonth = `${monthNames[currentMonthIndex + 1]} ${currentYear}`;
     setSelectedMonth(currentMonth);
   }, []);
 
-  const handleCalculate = async () => {
-    if (!selectedMonth) {
-      alert("Please select a month before calculating.");
-      return;
-    }
+  // 🔹 Auto-fetch when page loads or when month filter changes
+  useEffect(() => {
+    if (!selectedMonth) return;
 
-    try {
-      setLoading(true);
-      setMessage("");
-      const res = await axios.post(`${apiUrl}/calculator/monthly-analysis`, {
-        month: selectedMonth === "All Months" ? "all" : selectedMonth,
-      });
-      setTableData(res.data);
-      setMessage("Budget analysis completed successfully!");
-      console.log("Budget analysis result:", res.data);
-    } catch (error) {
-      console.error("Error calculating budget analysis:", error);
-      setMessage("Failed to calculate budget analysis.");
-    } finally {
-      setLoading(false);
-    }
-  };
+    const fetchMonthlyData = async () => {
+      try {
+        setLoading(true);
+        setMessage("");
+        const res = await axios.post(`${apiUrl}/calculator/monthly-analysis`, {
+          month: selectedMonth === "All Months" ? "all" : selectedMonth,
+        });
+        setTableData(res.data);
+        setMessage("Budget analysis updated successfully!");
+        console.log("Budget analysis result:", res.data);
+      } catch (error) {
+        console.error("Error fetching budget analysis:", error);
+        setMessage("Failed to fetch budget analysis.");
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchMonthlyData();
+  }, [selectedMonth]); // 👈 refetch whenever selectedMonth changes
 
   const handleReset = () => {
-    // Reset to current month instead of blank for better UX
     const currentMonth = `${monthNames[currentMonthIndex + 1]} ${currentYear}`;
     setSelectedMonth(currentMonth);
     setMessage("");
@@ -84,21 +85,13 @@ const MonthlyBudgetAnalysis = () => {
           onChange={setSelectedMonth}
         />
 
-        {/* Action Buttons */}
-        <div className="flex gap-x-4">
-          <button
-            onClick={handleCalculate}
-            disabled={!selectedMonth || loading}
-            className={`w-1/2 bg-blue-500 text-white px-4 py-2 rounded-xl hover:bg-blue-600 transition ${
-              !selectedMonth || loading ? "opacity-50 cursor-not-allowed" : ""
-            }`}
-          >
-            {loading ? "Calculating..." : "Calculate"}
-          </button>
-
+        {/* Reset Button */}
+        <div className="flex justify-end">
           <button
             onClick={handleReset}
-            className="w-1/2 bg-gray-200 text-gray-800 px-4 py-2 rounded-xl hover:bg-gray-300 transition"
+            disabled={loading}
+            className={`bg-gray-200 text-gray-800 px-4 py-2 rounded-xl hover:bg-gray-300 transition ${loading ? "opacity-50 cursor-not-allowed" : ""
+              }`}
           >
             Reset
           </button>
@@ -111,8 +104,13 @@ const MonthlyBudgetAnalysis = () => {
           </div>
         )}
 
+        {/* Table */}
         <div>
-          <MonthlyAnalysisTable data={tableData} />
+          {loading ? (
+            <p className="text-gray-500 italic">Loading...</p>
+          ) : (
+            <MonthlyAnalysisTable data={tableData} />
+          )}
         </div>
       </div>
     </div>

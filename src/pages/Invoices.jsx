@@ -1,18 +1,18 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { BsDownload } from "react-icons/bs";
-
 
 const apiBaseUrl = import.meta.env.VITE_BACKEND_URL;
 
 const Invoices = () => {
   const [invoices, setInvoices] = useState([]);
+  const [projectsList, setProjectsList] = useState([]); // NEW: State for all projects
+  const [subprojectsList, setSubprojectsList] = useState([]); // NEW: State for all subprojects
   const [isLoading, setIsLoading] = useState(true);
   // UPDATED: Initial state for new filters
   const [filters, setFilters] = useState({
     search: '',
     billingMonth: 'all',
-    projectName: '',
-    subprojectName: ''
+    projectName: '', // Filter by selected Project ID
+    subprojectName: '' // Filter by selected Subproject ID
   });
   const [selectedInvoice, setSelectedInvoice] = useState(null);
   const [isPdfLibReady, setIsPdfLibReady] = useState(false);
@@ -41,6 +41,36 @@ const Invoices = () => {
 
     loadPdfScripts();
   }, []);
+
+  // --- FETCH PROJECTS AND SUBPROJECTS FOR FILTERS ---
+  useEffect(() => {
+    const fetchProjects = async () => {
+      try {
+        const res = await fetch(`${apiBaseUrl}/project/project-subproject`);
+        if (!res.ok) throw new Error('Failed to fetch project structure');
+        const projectStructure = await res.json();
+
+        // Extract unique lists
+        const projects = projectStructure.map(p => ({ _id: p._id, name: p.name }));
+        const subprojects = projectStructure.flatMap(p =>
+          (p.subprojects || []).map(sp => ({
+            _id: sp._id,
+            name: sp.name,
+            projectId: p._id
+          }))
+        );
+
+        setProjectsList(projects);
+        setSubprojectsList(subprojects);
+
+      } catch (err) {
+        console.error('Error fetching project data for filters:', err);
+      }
+    };
+
+    fetchProjects();
+  }, []);
+
 
   // --- FETCH INVOICES ONLY ---
   useEffect(() => {
@@ -98,8 +128,8 @@ const Invoices = () => {
   const filteredInvoices = useMemo(() => {
     const searchLower = filters.search.toLowerCase();
     const monthFilter = filters.billingMonth;
-    const projectFilterLower = filters.projectName.toLowerCase();
-    const subprojectFilterLower = filters.subprojectName.toLowerCase();
+    const projectIdFilter = filters.projectName; // This is now an ID
+    const subprojectIdFilter = filters.subprojectName; // This is now an ID
 
     return invoices.filter(inv => {
       // 1. Invoice Number Search
@@ -122,15 +152,15 @@ const Invoices = () => {
       // 3 & 4. Project/Subproject Filtering (Check if ANY record matches)
       const records = getLookups(inv);
 
-      // Filter by Project Name
-      if (projectFilterLower) {
-        const projectMatch = records.some(r => r.projectName.toLowerCase().includes(projectFilterLower));
+      // Filter by Project ID
+      if (projectIdFilter) {
+        const projectMatch = records.some(r => (r.project_id?._id || r.project_id) === projectIdFilter);
         if (!projectMatch) return false;
       }
 
-      // Filter by Subproject Name
-      if (subprojectFilterLower) {
-        const subprojectMatch = records.some(r => r.subprojectName.toLowerCase().includes(subprojectFilterLower));
+      // Filter by Subproject ID
+      if (subprojectIdFilter) {
+        const subprojectMatch = records.some(r => (r.subproject_id?._id || r.subproject_id) === subprojectIdFilter);
         if (!subprojectMatch) return false;
       }
 
@@ -151,7 +181,7 @@ const Invoices = () => {
       minute: '2-digit',
     });
 
-  // NEW HELPER: Retrieves the billing month/year string for the table display
+  // Retrieves the billing month/year string for the table display
   const getBillingMonthText = (invoice) => {
     const firstRecord = invoice.billing_records?.[0];
     if (firstRecord && firstRecord.month && firstRecord.year) {
@@ -163,61 +193,55 @@ const Invoices = () => {
 
   const handleFilterChange = (e) => {
     const { name, value } = e.target;
-    setFilters(prev => ({ ...prev, [name]: value }));
+
+    let newFilters = { ...filters, [name]: value };
+
+    // If the project filter changes, reset the subproject filter
+    if (name === 'projectName') {
+      newFilters.subprojectName = '';
+    }
+
+    setFilters(newFilters);
   };
 
-  const handleDownloadPdfDirect = (invoice) => {
-    if (!isPdfLibReady || !invoice) {
-      console.error("PDF generation library not ready or no invoice provided.");
-      alert("PDF generation is not ready. Please wait a moment and try again.");
-      return;
-    }
+  const handleDownloadPdf = () => {
+    // NOTE: alert is used here as a placeholder for a custom UI modal, which is required per instructions.
+    if (!isPdfLibReady || !selectedInvoice) return alert("PDF not ready or no invoice selected.");
 
     const { jsPDF } = window.jspdf;
     const doc = new jsPDF();
 
-    // Header
     doc.setFontSize(20);
-    doc.text(`Invoice: ${invoice.invoice_number}`, 14, 22);
+    doc.text(`Invoice: ${selectedInvoice.invoice_number}`, 14, 22);
 
-    const firstRecord = invoice.billing_records[0];
-    if (firstRecord) {
-      const monthYear = `${new Date(0, firstRecord.month - 1).toLocaleString('default', { month: 'long' })} ${firstRecord.year}`;
+    const first = selectedInvoice.billing_records[0];
+    if (first) {
+      const period = `${new Date(0, first.month - 1).toLocaleString('default', { month: 'long' })} ${first.year}`;
       doc.setFontSize(12);
-      doc.text(`For Period: ${monthYear}`, 14, 30);
+      doc.text(`For Period: ${period}`, 14, 30);
     }
-    doc.setFontSize(10);
-    doc.text(`Date Generated: ${formatDate(invoice.createdAt)}`, 14, 36);
+    doc.text(`Date Generated: ${formatDate(selectedInvoice.createdAt)}`, 14, 36);
 
-    // Table
-    const tableData = getLookups(invoice);
+    const rows = getLookups(selectedInvoice);
     const head = [['Project', 'Sub-Project', 'Resource', 'Hours', 'Rate', 'Total', 'Status']];
-    const body = tableData.map(row => [
-      row.projectName,
-      row.subprojectName,
-      row.resourceName,
-      row.hours,
-      formatCurrency(row.rate),
-      formatCurrency(row.hours * row.rate),
-      row.billable_status
+    const body = rows.map(r => [
+      r.projectName,
+      r.subprojectName,
+      r.resourceName,
+      r.hours,
+      formatCurrency(r.rate),
+      formatCurrency(r.hours * r.rate),
+      r.billable_status
     ]);
 
-    doc.autoTable({ startY: 45, head: head, body: body });
-
-    // Summary
+    doc.autoTable({ startY: 45, head, body });
     const finalY = doc.autoTable.previous.finalY;
+
     doc.setFontSize(14);
     doc.setFont('helvetica', 'bold');
-    doc.text(`Total Amount: ${formatCurrency(invoice.total_amount)}`, 14, finalY + 15);
+    doc.text(`Total Amount: ${formatCurrency(selectedInvoice.total_amount)}`, 14, finalY + 15);
 
-    // Save
-    doc.save(`Invoice-${invoice.invoice_number}.pdf`);
-  };
-
-
-  // Keep this old one for the modal (calls the new one)
-  const handleDownloadPdf = () => {
-    handleDownloadPdfDirect(selectedInvoice);
+    doc.save(`Invoice-${selectedInvoice.invoice_number}.pdf`);
   };
 
   // --- RENDER ---
@@ -248,7 +272,7 @@ const Invoices = () => {
               />
             </div>
 
-            {/* 2. NEW: Billing Month Filter */}
+            {/* 2. Billing Month Filter */}
             <div>
               <label htmlFor="billingMonth" className="block text-sm font-medium text-gray-700">Billing Month</label>
               <select
@@ -266,35 +290,42 @@ const Invoices = () => {
               </select>
             </div>
 
-            {/* 3. NEW: Project Name Filter */}
+            {/* 3. NEW: Project Name Filter (Using fetched project IDs) */}
             <div>
               <label htmlFor="projectName" className="block text-sm font-medium text-gray-700">Project Name</label>
-              <input
-                type="text"
-                name="projectName"
+              <select
                 id="projectName"
+                name="projectName"
                 value={filters.projectName}
                 onChange={handleFilterChange}
-                placeholder="e.g., Alpha Project"
-                className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
-              />
+                className="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+              >
+                <option value="">All Projects</option>
+                {projectsList.map(p => (
+                  <option key={p._id} value={p._id}>{p.name}</option>
+                ))}
+              </select>
             </div>
 
-            {/* 4. NEW: Subproject Name Filter */}
+            {/* 4. NEW: Subproject Name Filter (Filtered by Project selection) */}
             <div>
               <label htmlFor="subprojectName" className="block text-sm font-medium text-gray-700">Subproject Name</label>
-              <input
-                type="text"
-                name="subprojectName"
+              <select
                 id="subprojectName"
+                name="subprojectName"
                 value={filters.subprojectName}
                 onChange={handleFilterChange}
-                placeholder="e.g., Phase 2 Migration"
-                className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
-              />
+                disabled={!filters.projectName}
+                className="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 sm:text-sm disabled:bg-gray-100"
+              >
+                <option value="">All Subprojects</option>
+                {subprojectsList
+                  .filter(sp => sp.projectId === filters.projectName)
+                  .map(sp => (
+                    <option key={sp._id} value={sp._id}>{sp.name}</option>
+                  ))}
+              </select>
             </div>
-
-            {/* REMOVED: Status filter */}
           </div>
         </div>
 
@@ -305,7 +336,7 @@ const Invoices = () => {
               <thead className="bg-gray-50">
                 <tr>
                   {/* UPDATED HEADER ARRAY */}
-                  {['Invoice #', 'Billing Month', 'Amount', 'Billable Amount', 'Non-Billable Amount', 'Items', 'Created', 'Actions'].map(header => (
+                  {['Invoice #', 'Billing Month', 'Amount', 'Billable Amount', 'Non-Billable Amount', 'Items', 'Created'].map(header => (
                     <th key={header} className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{header}</th>
                   ))}
                 </tr>
@@ -327,21 +358,6 @@ const Invoices = () => {
                     <td className="px-6 py-4 text-sm text-red-700">{formatCurrency(invoice.total_non_billable_amount)}</td>
                     <td className="px-6 py-4 text-sm text-gray-500">{invoice.billing_records.length}</td>
                     <td className="px-6 py-4 text-sm text-gray-500">{formatDate(invoice.createdAt)}</td>
-                    <td className="px-6 py-4 whitespace-nowrap text-center">
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation(); // Prevent opening modal
-                          handleDownloadPdfDirect(invoice);
-                        }}
-                        disabled={!isPdfLibReady}
-                        className={`text-blue-600 hover:text-blue-800 transition ${!isPdfLibReady ? 'opacity-50 cursor-not-allowed' : ''
-                          }`}
-                        title="Download PDF"
-                      >
-                        <BsDownload size={18} />
-                      </button>
-                    </td>
-
                   </tr>
                 ))}
               </tbody>
