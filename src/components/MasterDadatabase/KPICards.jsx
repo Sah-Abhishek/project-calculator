@@ -10,7 +10,10 @@ import {
 } from "lucide-react";
 import axios from "axios";
 
-const API_URL = "http://192.168.1.15:3000/api/masterdb/dashboard-stats";
+
+const backendUrl = import.meta.env.VITE_BACKEND_URL;
+
+const API_URL = `${backendUrl}/masterdb/dashboard-stats`;
 
 const KPICards = () => {
   const [stats, setStats] = useState(null);

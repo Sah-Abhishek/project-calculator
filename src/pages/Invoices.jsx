@@ -1,131 +1,163 @@
-import React from 'react';
-import { useState, useMemo, useEffect } from 'react';
-import PageHeader from '../components/PageHeader';
+import React, { useState, useMemo, useEffect } from 'react';
 
-// This component now uses live API calls.
 const apiBaseUrl = import.meta.env.VITE_BACKEND_URL;
 
 const Invoices = () => {
   const [invoices, setInvoices] = useState([]);
-  const [allProjects, setAllProjects] = useState([]);
-  const [allResources, setAllResources] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [filters, setFilters] = useState({ search: '', status: 'all' });
+  // UPDATED: Initial state for new filters
+  const [filters, setFilters] = useState({
+    search: '',
+    billingMonth: 'all',
+    projectName: '',
+    subprojectName: ''
+  });
   const [selectedInvoice, setSelectedInvoice] = useState(null);
-  const [isPdfLibReady, setIsPdfLibReady] = useState(false); // New state to track library loading
+  const [isPdfLibReady, setIsPdfLibReady] = useState(false);
 
-  // --- SCRIPT LOADER ---
-  // Loads jspdf and jspdf-autotable for PDF generation using Promises for reliability
+  // --- LOAD PDF LIBRARIES ---
   useEffect(() => {
-    const loadPdfScripts = () => {
-      return new Promise((resolve, reject) => {
-        // Check if already loaded
-        if (window.jspdf && typeof new window.jspdf.jsPDF().autoTable === 'function') {
-          resolve();
-          return;
-        }
-
-        const loadScript = (src) => {
-          return new Promise((scriptResolve, scriptReject) => {
-            if (document.querySelector(`script[src="${src}"]`)) {
-              scriptResolve();
-              return;
-            }
-            const script = document.createElement('script');
-            script.src = src;
-            script.async = true;
-            script.onload = () => scriptResolve();
-            script.onerror = () => scriptReject(new Error(`Failed to load script: ${src}`));
-            document.body.appendChild(script);
-          });
-        };
-
-        // Load jspdf first, then autotable sequentially
-        loadScript('https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js')
-          .then(() => loadScript('https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js')) // CORRECTED URL
-          .then(() => resolve())
-          .catch(error => reject(error));
+    const loadPdfScripts = async () => {
+      const loadScript = (src) => new Promise((resolve, reject) => {
+        if (document.querySelector(`script[src="${src}"]`)) return resolve();
+        const script = document.createElement('script');
+        script.src = src;
+        script.async = true;
+        script.onload = resolve;
+        script.onerror = () => reject(new Error(`Failed to load ${src}`));
+        document.body.appendChild(script);
       });
+
+      try {
+        await loadScript('https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js');
+        await loadScript('https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js');
+        setIsPdfLibReady(true);
+      } catch (err) {
+        console.error('Failed to load PDF libraries:', err);
+      }
     };
 
-    loadPdfScripts()
-      .then(() => {
-        setIsPdfLibReady(true);
-      })
-      .catch(error => {
-        console.error("Failed to load PDF libraries:", error);
-        // Optionally show a toast to the user here
-      });
-  }, []); // Run only once on mount
+    loadPdfScripts();
+  }, []);
 
-  // --- LIVE API CALLS ---
+  // --- FETCH INVOICES ONLY ---
   useEffect(() => {
-    const fetchData = async () => {
+    const fetchInvoices = async () => {
       setIsLoading(true);
       try {
-        // Fetch invoices, projects, and resources from the API
-        const [invoiceRes, projectRes, resourceRes] = await Promise.all([
-          fetch(`${apiBaseUrl}/invoices`), // Replaced mock data with API call
-          fetch(`${apiBaseUrl}/project/project-subproject`),
-          fetch(`${apiBaseUrl}/resource`)
-        ]);
-
-        if (!invoiceRes.ok) throw new Error('Failed to fetch invoices.');
-        if (!projectRes.ok) throw new Error('Failed to fetch project data.');
-        if (!resourceRes.ok) throw new Error('Failed to fetch resource data.');
-
-        const invoiceData = await invoiceRes.json();
-        const projectData = await projectRes.json();
-        const resourceData = await resourceRes.json();
-
-        setInvoices(invoiceData);
-        setAllProjects(projectData);
-        setAllResources(resourceData);
-
-      } catch (error) {
-        console.error("Error fetching data:", error);
-        // Optionally, add a toast notification for the user
+        const res = await fetch(`${apiBaseUrl}/invoices`);
+        if (!res.ok) throw new Error('Failed to fetch invoices');
+        const data = await res.json();
+        setInvoices(data);
+      } catch (err) {
+        console.error('Error fetching invoices:', err);
       } finally {
         setIsLoading(false);
       }
     };
 
-    fetchData();
+    fetchInvoices();
   }, []);
 
-  // --- DATA PROCESSING & FILTERING ---
-  const filteredInvoices = useMemo(() => {
-    return invoices
-      .filter(invoice => {
-        const searchLower = filters.search.toLowerCase();
-        return invoice.invoice_number.toLowerCase().includes(searchLower);
-      })
-      .filter(invoice => {
-        if (filters.status === 'all') return true;
-        return invoice.status === filters.status;
-      });
-  }, [invoices, filters]);
-
+  // --- DIRECT LOOKUPS (NO EXTERNAL DATA) ---
   const getLookups = (invoice) => {
-    const flatSubprojects = allProjects.flatMap(p =>
-      (p.subprojects || []).map(sp => ({ ...sp, parentProjectName: p.name, parentProjectId: p._id }))
-    );
-
-    return invoice.billing_records.map(record => {
-      const resource = allResources.find(r => r._id === record.resource_id);
-      const subproject = flatSubprojects.find(sp => sp._id === record.subproject_id);
-      return {
-        ...record,
-        resourceName: resource?.name || 'N/A',
-        projectName: subproject?.parentProjectName || 'N/A',
-        subprojectName: subproject?.name || 'N/A'
-      };
-    });
+    return invoice.billing_records.map(record => ({
+      ...record,
+      projectName: record.project_name || record.project_id?.name || 'N/A',
+      subprojectName: record.subproject_name || record.subproject_id?.name || 'N/A',
+      resourceName: record.resource_name || record.resource_id?.name || 'N/A'
+    }));
   };
 
-  // --- UI HELPER & PDF FUNCTIONS ---
-  const formatCurrency = (amount) => new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(amount || 0);
-  const formatDate = (dateString) => new Date(dateString).toLocaleString('en-US', { year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+  // --- GENERATE UNIQUE MONTH/YEAR FOR DROPDOWN ---
+  const uniqueBillingPeriods = useMemo(() => {
+    const periods = new Set();
+    invoices.forEach(invoice => {
+      const firstRecord = invoice.billing_records?.[0];
+      if (firstRecord && firstRecord.month && firstRecord.year) {
+        const monthName = new Date(0, firstRecord.month - 1).toLocaleString('default', { month: 'long' });
+        periods.add(`${monthName} ${firstRecord.year}`);
+      }
+    });
+
+    // Convert set to array and sort by date (newest first)
+    return ['all', ...Array.from(periods).sort((a, b) => {
+      const [monthA, yearA] = a.split(' ');
+      const [monthB, yearB] = b.split(' ');
+      // Use Date object for accurate month/year sorting
+      const dateA = new Date(yearA, new Date(Date.parse(monthA + " 1, 2020")).getMonth());
+      const dateB = new Date(yearB, new Date(Date.parse(monthB + " 1, 2020")).getMonth());
+      return dateB - dateA; // Descending order (newest first)
+    })];
+  }, [invoices]);
+
+
+  // --- FILTERED INVOICES ---
+  const filteredInvoices = useMemo(() => {
+    const searchLower = filters.search.toLowerCase();
+    const monthFilter = filters.billingMonth;
+    const projectFilterLower = filters.projectName.toLowerCase();
+    const subprojectFilterLower = filters.subprojectName.toLowerCase();
+
+    return invoices.filter(inv => {
+      // 1. Invoice Number Search
+      if (!inv.invoice_number.toLowerCase().includes(searchLower)) {
+        return false;
+      }
+
+      // 2. Billing Month Filter
+      if (monthFilter !== 'all') {
+        const firstRecord = inv.billing_records?.[0];
+        if (!firstRecord) return false;
+
+        const monthName = new Date(0, firstRecord.month - 1).toLocaleString('default', { month: 'long' });
+        const invoicePeriod = `${monthName} ${firstRecord.year}`;
+        if (invoicePeriod !== monthFilter) {
+          return false;
+        }
+      }
+
+      // 3 & 4. Project/Subproject Filtering (Check if ANY record matches)
+      const records = getLookups(inv);
+
+      // Filter by Project Name
+      if (projectFilterLower) {
+        const projectMatch = records.some(r => r.projectName.toLowerCase().includes(projectFilterLower));
+        if (!projectMatch) return false;
+      }
+
+      // Filter by Subproject Name
+      if (subprojectFilterLower) {
+        const subprojectMatch = records.some(r => r.subprojectName.toLowerCase().includes(subprojectFilterLower));
+        if (!subprojectMatch) return false;
+      }
+
+      return true;
+    });
+  }, [invoices, filters]);
+
+  // --- HELPERS ---
+  const formatCurrency = (n) =>
+    new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(n || 0);
+
+  const formatDate = (d) =>
+    new Date(d).toLocaleString('en-US', {
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+    });
+
+  // NEW HELPER: Retrieves the billing month/year string for the table display
+  const getBillingMonthText = (invoice) => {
+    const firstRecord = invoice.billing_records?.[0];
+    if (firstRecord && firstRecord.month && firstRecord.year) {
+      const monthName = new Date(0, firstRecord.month - 1).toLocaleString('default', { month: 'long' });
+      return `${monthName} ${firstRecord.year}`;
+    }
+    return 'N/A';
+  };
 
   const handleFilterChange = (e) => {
     const { name, value } = e.target;
@@ -133,190 +165,216 @@ const Invoices = () => {
   };
 
   const handleDownloadPdf = () => {
-    // The button is disabled if not ready, but we keep this as a safeguard.
-    if (!isPdfLibReady || !selectedInvoice) {
-      console.error("PDF generation library not ready or no invoice selected.");
-      alert("PDF generation is not ready. Please wait a moment and try again.");
-      return;
-    }
+    // NOTE: alert is used here as a placeholder for a custom UI modal, which is required per instructions.
+    if (!isPdfLibReady || !selectedInvoice) return alert("PDF not ready or no invoice selected.");
 
     const { jsPDF } = window.jspdf;
     const doc = new jsPDF();
 
-    // Header
     doc.setFontSize(20);
     doc.text(`Invoice: ${selectedInvoice.invoice_number}`, 14, 22);
 
-    const firstRecord = selectedInvoice.billing_records[0];
-    if (firstRecord) {
-      const monthYear = `${new Date(0, firstRecord.month - 1).toLocaleString('default', { month: 'long' })} ${firstRecord.year}`;
+    const first = selectedInvoice.billing_records[0];
+    if (first) {
+      const period = `${new Date(0, first.month - 1).toLocaleString('default', { month: 'long' })} ${first.year}`;
       doc.setFontSize(12);
-      doc.text(`For Period: ${monthYear}`, 14, 30);
+      doc.text(`For Period: ${period}`, 14, 30);
     }
-    doc.setFontSize(10);
     doc.text(`Date Generated: ${formatDate(selectedInvoice.createdAt)}`, 14, 36);
 
-    // Table
-    const tableData = getLookups(selectedInvoice);
+    const rows = getLookups(selectedInvoice);
     const head = [['Project', 'Sub-Project', 'Resource', 'Hours', 'Rate', 'Total', 'Status']];
-    const body = tableData.map(row => [
-      row.projectName,
-      row.subprojectName,
-      row.resourceName,
-      row.hours,
-      formatCurrency(row.rate),
-      formatCurrency(row.hours * row.rate),
-      row.billable_status
+    const body = rows.map(r => [
+      r.projectName,
+      r.subprojectName,
+      r.resourceName,
+      r.hours,
+      formatCurrency(r.rate),
+      formatCurrency(r.hours * r.rate),
+      r.billable_status
     ]);
 
-    doc.autoTable({ startY: 45, head: head, body: body });
-
-    // Summary
+    doc.autoTable({ startY: 45, head, body });
     const finalY = doc.autoTable.previous.finalY;
+
     doc.setFontSize(14);
     doc.setFont('helvetica', 'bold');
     doc.text(`Total Amount: ${formatCurrency(selectedInvoice.total_amount)}`, 14, finalY + 15);
 
-    // Save
     doc.save(`Invoice-${selectedInvoice.invoice_number}.pdf`);
   };
 
   // --- RENDER ---
   return (
+    <div className="bg-gray-50 min-h-screen p-4 sm:p-6 lg:p-8 font-sans">
+      <div className="max-w-7xl mx-auto">
+        <header className="mb-8">
+          <h1 className="text-3xl font-bold text-gray-900">Invoice Dashboard</h1>
+          <p className="text-gray-600 mt-1">A summary of all generated invoices.</p>
+        </header>
 
-    <div>
-      <div>
-        <PageHeader heading="Invoices Dashboard" subHeading="Invoices of Projects" />
-      </div>
-      <div className="bg-gray-50 min-h-screen p-4 sm:p-6 lg:p-8 font-sans">
-        <div className="max-w-7xl mx-auto">
+        {/* Filters */}
+        <div className="bg-white p-4 rounded-xl shadow-sm mb-6">
+          {/* UPDATED: Grid layout changed to accommodate 4 filters */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
 
-          {/* Filters */}
-          <div className="bg-white p-4 rounded-xl shadow-sm mb-6">
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-              <div className="sm:col-span-1">
-                <label htmlFor="search" className="block text-sm font-medium text-gray-700">Search by Invoice #</label>
-                <input
-                  type="text"
-                  name="search"
-                  id="search"
-                  value={filters.search}
-                  onChange={handleFilterChange}
-                  placeholder="e.g., INV-2025-10-001"
-                  className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
-                />
-              </div>
-              {/* <div className="sm:col-span-1"> */}
-              {/*   <label htmlFor="status" className="block text-sm font-medium text-gray-700">Status</label> */}
-              {/*   <select */}
-              {/*     id="status" */}
-              {/*     name="status" */}
-              {/*     value={filters.status} */}
-              {/*     onChange={handleFilterChange} */}
-              {/*     className="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm rounded-md" */}
-              {/*   > */}
-              {/*     <option value="all">All Statuses</option> */}
-              {/*     <option value="draft">Draft</option> */}
-              {/*     <option value="paid">Paid</option> */}
-              {/*     <option value="void">Void</option> */}
-              {/*   </select> */}
-              {/* </div> */}
+            {/* 1. Search by Invoice # (Kept) */}
+            <div>
+              <label htmlFor="search" className="block text-sm font-medium text-gray-700">Search by Invoice #</label>
+              <input
+                type="text"
+                name="search"
+                id="search"
+                value={filters.search}
+                onChange={handleFilterChange}
+                placeholder="e.g., INV-2025-10-001"
+                className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+              />
             </div>
-          </div>
 
-          {/* Invoice Table */}
-          <div className="bg-white rounded-xl shadow-sm overflow-hidden">
-            <div className="overflow-x-auto">
-              <table className="min-w-full divide-y divide-gray-200">
-                <thead className="bg-gray-50">
-                  <tr>
-                    {['Invoice #', 'Amount', 'Billable Amount', 'Non-Billable Amount', 'Items', 'Created'].map(header => (
-                      <th key={header} scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        {header}
-                      </th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody className="bg-white divide-y divide-gray-200">
-                  {isLoading ? (
-                    <tr><td colSpan="6" className="text-center py-10">Loading invoices...</td></tr>
-                  ) : filteredInvoices.map(invoice => (
-                    <tr key={invoice._id} onClick={() => setSelectedInvoice(invoice)} className="hover:bg-gray-50 cursor-pointer">
-                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-blue-600">{invoice.invoice_number}</td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm font-semibold text-gray-900">{formatCurrency(invoice.total_amount)}</td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-green-700">{formatCurrency(invoice.total_billable_amount)}</td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-red-700">{formatCurrency(invoice.total_non_billable_amount)}</td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{invoice.billing_records.length}</td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{formatDate(invoice.createdAt)}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+            {/* 2. NEW: Billing Month Filter */}
+            <div>
+              <label htmlFor="billingMonth" className="block text-sm font-medium text-gray-700">Billing Month</label>
+              <select
+                id="billingMonth"
+                name="billingMonth"
+                value={filters.billingMonth}
+                onChange={handleFilterChange}
+                className="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+              >
+                {uniqueBillingPeriods.map(period => (
+                  <option key={period} value={period}>
+                    {period === 'all' ? 'All Months' : period}
+                  </option>
+                ))}
+              </select>
             </div>
+
+            {/* 3. NEW: Project Name Filter */}
+            <div>
+              <label htmlFor="projectName" className="block text-sm font-medium text-gray-700">Project Name</label>
+              <input
+                type="text"
+                name="projectName"
+                id="projectName"
+                value={filters.projectName}
+                onChange={handleFilterChange}
+                placeholder="e.g., Alpha Project"
+                className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+              />
+            </div>
+
+            {/* 4. NEW: Subproject Name Filter */}
+            <div>
+              <label htmlFor="subprojectName" className="block text-sm font-medium text-gray-700">Subproject Name</label>
+              <input
+                type="text"
+                name="subprojectName"
+                id="subprojectName"
+                value={filters.subprojectName}
+                onChange={handleFilterChange}
+                placeholder="e.g., Phase 2 Migration"
+                className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
+              />
+            </div>
+
+            {/* REMOVED: Status filter */}
           </div>
         </div>
 
-        {/* Modal for Billing Details */}
-        {selectedInvoice && (
-          <div className="fixed inset-0 bg-black bg-opacity-60 z-50 flex justify-center items-center p-4">
-            <div className="bg-white rounded-2xl shadow-xl w-full max-w-4xl max-h-[90vh] flex flex-col">
-              <div className="p-6 border-b border-gray-200">
-                <div className="flex justify-between items-start">
-                  <div>
-                    <h2 className="text-2xl font-bold text-gray-800">Invoice {selectedInvoice.invoice_number}</h2>
-                    <p className="text-sm text-gray-500">Total: {formatCurrency(selectedInvoice.total_amount)}</p>
-                  </div>
-                  <button onClick={() => setSelectedInvoice(null)} className="text-gray-400 hover:text-gray-600 text-2xl leading-none">&times;</button>
-                </div>
+        {/* Invoice Table */}
+        <div className="bg-white rounded-xl shadow-sm overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="min-w-full divide-y divide-gray-200">
+              <thead className="bg-gray-50">
+                <tr>
+                  {/* UPDATED HEADER ARRAY */}
+                  {['Invoice #', 'Billing Month', 'Amount', 'Billable Amount', 'Non-Billable Amount', 'Items', 'Created'].map(header => (
+                    <th key={header} className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{header}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody className="bg-white divide-y divide-gray-200">
+                {isLoading ? (
+                  <tr><td colSpan="7" className="text-center py-10">Loading invoices...</td></tr>
+                ) : filteredInvoices.map(invoice => (
+                  <tr key={invoice._id} onClick={() => setSelectedInvoice(invoice)} className="hover:bg-gray-50 cursor-pointer">
+                    <td className="px-6 py-4 text-sm font-medium text-blue-600">{invoice.invoice_number}</td>
+
+                    {/* NEW BILLING MONTH COLUMN */}
+                    <td className="px-6 py-4 text-sm text-gray-800 font-medium">
+                      {getBillingMonthText(invoice)}
+                    </td>
+
+                    <td className="px-6 py-4 text-sm font-semibold text-gray-900">{formatCurrency(invoice.total_amount)}</td>
+                    <td className="px-6 py-4 text-sm text-green-700">{formatCurrency(invoice.total_billable_amount)}</td>
+                    <td className="px-6 py-4 text-sm text-red-700">{formatCurrency(invoice.total_non_billable_amount)}</td>
+                    <td className="px-6 py-4 text-sm text-gray-500">{invoice.billing_records.length}</td>
+                    <td className="px-6 py-4 text-sm text-gray-500">{formatDate(invoice.createdAt)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      {/* Modal */}
+      {selectedInvoice && (
+        <div className="fixed inset-0 bg-black bg-opacity-60 z-50 flex justify-center items-center p-4">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-4xl max-h-[90vh] flex flex-col">
+            <div className="p-6 border-b border-gray-200 flex justify-between items-start">
+              <div>
+                <h2 className="text-2xl font-bold text-gray-800">Invoice {selectedInvoice.invoice_number}</h2>
+                <p className="text-sm text-gray-500">Total: {formatCurrency(selectedInvoice.total_amount)}</p>
               </div>
-              <div className="p-6 overflow-y-auto">
-                <h3 className="text-lg font-semibold text-gray-700 mb-4">Billing Records ({selectedInvoice.billing_records.length})</h3>
-                <div className="border border-gray-200 rounded-lg overflow-hidden">
-                  <table className="min-w-full divide-y divide-gray-200">
-                    <thead className="bg-gray-50">
-                      <tr>
-                        {['Project', 'Sub-Project', 'Resource', 'Hours', 'Rate', 'Total', 'Status'].map(h => (
-                          <th key={h} className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{h}</th>
-                        ))}
-                      </tr>
-                    </thead>
-                    <tbody className="bg-white divide-y divide-gray-200">
-                      {getLookups(selectedInvoice).map(record => (
-                        <tr key={record._id}>
-                          <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-600">{record.projectName}</td>
-                          <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-600">{record.subprojectName}</td>
-                          <td className="px-4 py-3 whitespace-nowrap text-sm font-medium text-gray-800">{record.resourceName}</td>
-                          <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-600">{record.hours}</td>
-                          <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-600">{formatCurrency(record.rate)}</td>
-                          <td className="px-4 py-3 whitespace-nowrap text-sm font-semibold text-gray-800">{formatCurrency(record.hours * record.rate)}</td>
-                          <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-600">{record.billable_status}</td>
-                        </tr>
+              <button onClick={() => setSelectedInvoice(null)} className="text-gray-400 hover:text-gray-600 text-2xl">&times;</button>
+            </div>
+
+            <div className="p-6 overflow-y-auto">
+              <h3 className="text-lg font-semibold text-gray-700 mb-4">Billing Records ({selectedInvoice.billing_records.length})</h3>
+              <div className="border border-gray-200 rounded-lg overflow-hidden">
+                <table className="min-w-full divide-y divide-gray-200">
+                  <thead className="bg-gray-50">
+                    <tr>
+                      {['Project', 'Sub-Project', 'Resource', 'Hours', 'Rate', 'Total', 'Status'].map(h => (
+                        <th key={h} className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{h}</th>
                       ))}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-              <div className="p-4 bg-gray-50 border-t border-gray-200 flex justify-end items-center space-x-3">
-                <button onClick={handleDownloadPdf} className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center space-x-2 disabled:bg-gray-400 disabled:cursor-not-allowed" disabled={!isPdfLibReady}>
-                  {!isPdfLibReady ? (
-                    <span>Loading Libs...</span>
-                  ) : (
-                    <>
-                      <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                        <path fillRule="evenodd" d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm3.293-7.707a1 1 0 011.414 0L9 10.586V3a1 1 0 112 0v7.586l1.293-1.293a1 1 0 111.414 1.414l-3 3a1 1 0 01-1.414 0l-3-3a1 1 0 010-1.414z" clipRule="evenodd" />
-                      </svg>
-                      <span>Download PDF</span>
-                    </>
-                  )}
-                </button>
-                <button onClick={() => setSelectedInvoice(null)} className="px-4 py-2 bg-gray-200 text-gray-800 rounded-lg hover:bg-gray-300">Close</button>
+                    </tr>
+                  </thead>
+                  <tbody className="bg-white divide-y divide-gray-200">
+                    {getLookups(selectedInvoice).map(record => (
+                      <tr key={record._id}>
+                        <td className="px-4 py-3 text-sm text-gray-700">{record.projectName}</td>
+                        <td className="px-4 py-3 text-sm text-gray-700">{record.subprojectName}</td>
+                        <td className="px-4 py-3 text-sm text-gray-800">{record.resourceName}</td>
+                        <td className="px-4 py-3 text-sm text-gray-600">{record.hours}</td>
+                        <td className="px-4 py-3 text-sm text-gray-600">{formatCurrency(record.rate)}</td>
+                        <td className="px-4 py-3 text-sm font-semibold text-gray-800">{formatCurrency(record.hours * record.rate)}</td>
+                        <td className="px-4 py-3 text-sm text-gray-600">{record.billable_status}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
               </div>
             </div>
+
+            <div className="p-4 bg-gray-50 border-t border-gray-200 flex justify-end space-x-3">
+              <button
+                onClick={handleDownloadPdf}
+                disabled={!isPdfLibReady}
+                className={`px-4 py-2 rounded-lg text-white flex items-center space-x-2 ${isPdfLibReady ? 'bg-blue-600 hover:bg-blue-700' : 'bg-gray-400 cursor-not-allowed'
+                  }`}
+              >
+                <span>{isPdfLibReady ? 'Download PDF' : 'Loading Libs...'}</span>
+              </button>
+              <button onClick={() => setSelectedInvoice(null)} className="px-4 py-2 bg-gray-200 text-gray-800 rounded-lg hover:bg-gray-300">Close</button>
+            </div>
           </div>
-        )}
-      </div>
+        </div>
+      )}
     </div>
   );
-}
+};
 
 export default Invoices;

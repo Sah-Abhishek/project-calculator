@@ -11,11 +11,12 @@ const ProjectCostEstimation = () => {
   const [selectedMonth, setSelectedMonth] = useState("");
   const [loading, setLoading] = useState(false);
   const [submitMessage, setSubmitMessage] = useState("");
+  const apiUrl = import.meta.env.VITE_BACKEND_URL;
 
   useEffect(() => {
     const fetchProjects = async () => {
       try {
-        const res = await axios.get("http://192.168.1.15:3000/api/project/project-subproject");
+        const res = await axios.get(`${apiUrl}/project/project-subproject`);
         setProjects(res.data);
       } catch (error) {
         console.error("Failed to fetch projects:", error);
@@ -27,7 +28,6 @@ const ProjectCostEstimation = () => {
   // Selected project object
   const selectedProject = projects.find((p) => p.name === selectedProjectName);
   const subprojects = selectedProject ? selectedProject.subprojects : [];
-  const apiUrl = import.meta.env.VITE_BACKEND_URL;
 
   // Build month list
   const months = useMemo(() => {

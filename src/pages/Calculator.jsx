@@ -21,7 +21,7 @@ const Calculator = () => {
   });
   const apiUrl = import.meta.env.VITE_BACKEND_URL;
 
-  const [activeTab, setActiveTab] = useState("Project Cost Estimation");
+  const [activeTab, setActiveTab] = useState("Monthly Budget Analysis");
 
   useEffect(() => {
     const fetchStatusCardsData = async () => {
@@ -78,7 +78,7 @@ const Calculator = () => {
       {/* Tabs */}
       <div className="px-6">
         <div className="flex space-x-4 border-b border-gray-200 mb-4">
-          {["Project Cost Estimation", "Resource Allocation Analysis", "Monthly Budget Analysis"].map((tab) => (
+          {[ "Monthly Budget Analysis", "Project Cost Estimation", "Resource Allocation Analysis"].map((tab) => (
             <button
               key={tab}
               className={`py-2 px-4 text-sm font-medium border-b-2 transition ${activeTab === tab

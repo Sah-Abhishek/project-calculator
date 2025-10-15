@@ -1,6 +1,6 @@
-import React from 'react';
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import PageHeader from '../components/PageHeader';
+
 
 // This component now uses API calls instead of initial dummy data.
 const apiBaseUrl = import.meta.env.VITE_BACKEND_URL; // Change this to your actual API base URL
@@ -315,6 +315,8 @@ const Billing = () => {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(payload),
         });
+        filteredResources();
+
       } else {
         response = await fetch(`${apiBaseUrl}/billing`, {
           method: 'POST',
@@ -702,7 +704,7 @@ const Billing = () => {
                 <div className="flex items-center space-x-3">
                   <button onClick={handleSaveBilling} className="bg-green-500 text-white px-6 py-3 rounded-xl font-semibold hover:bg-green-600 hover:shadow-lg transition-all duration-200 transform hover:scale-105 flex items-center space-x-2">
                     <i className="fas fa-save"></i>
-                    <span>Save & Invoice</span>
+                    <span>Save Invoice</span>
                   </button>
                 </div>
               </div>

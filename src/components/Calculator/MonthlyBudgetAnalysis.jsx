@@ -1,5 +1,4 @@
-
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import FancyDropdown from "../FancyDropdown";
 import axios from "axios";
 import MonthlyAnalysisTable from "./Table/MonthlyAnalysisTable";
@@ -12,8 +11,8 @@ const MonthlyBudgetAnalysis = () => {
   const [tableData, setTableData] = useState({});
 
   const currentYear = new Date().getFullYear();
-
-  const months = [
+  const currentMonthIndex = new Date().getMonth(); // 0–11
+  const monthNames = [
     "All Months",
     "January",
     "February",
@@ -27,7 +26,18 @@ const MonthlyBudgetAnalysis = () => {
     "October",
     "November",
     "December",
-  ].map((month) => (month === "All Months" ? month : `${month} ${currentYear}`));
+  ];
+
+  // Generate list of options dynamically
+  const months = monthNames.map((month) =>
+    month === "All Months" ? month : `${month} ${currentYear}`
+  );
+
+  // 🧠 Set the default selected month when component mounts
+  useEffect(() => {
+    const currentMonth = `${monthNames[currentMonthIndex + 1]} ${currentYear}`;
+    setSelectedMonth(currentMonth);
+  }, []);
 
   const handleCalculate = async () => {
     if (!selectedMonth) {
@@ -38,7 +48,6 @@ const MonthlyBudgetAnalysis = () => {
     try {
       setLoading(true);
       setMessage("");
-      // Replace this endpoint with your backend API
       const res = await axios.post(`${apiUrl}/calculator/monthly-analysis`, {
         month: selectedMonth === "All Months" ? "all" : selectedMonth,
       });
@@ -54,7 +63,9 @@ const MonthlyBudgetAnalysis = () => {
   };
 
   const handleReset = () => {
-    setSelectedMonth("");
+    // Reset to current month instead of blank for better UX
+    const currentMonth = `${monthNames[currentMonthIndex + 1]} ${currentYear}`;
+    setSelectedMonth(currentMonth);
     setMessage("");
   };
 
@@ -78,8 +89,9 @@ const MonthlyBudgetAnalysis = () => {
           <button
             onClick={handleCalculate}
             disabled={!selectedMonth || loading}
-            className={`w-1/2 bg-blue-500 text-white px-4 py-2 rounded-xl hover:bg-blue-600 transition ${!selectedMonth || loading ? "opacity-50 cursor-not-allowed" : ""
-              }`}
+            className={`w-1/2 bg-blue-500 text-white px-4 py-2 rounded-xl hover:bg-blue-600 transition ${
+              !selectedMonth || loading ? "opacity-50 cursor-not-allowed" : ""
+            }`}
           >
             {loading ? "Calculating..." : "Calculate"}
           </button>
@@ -98,6 +110,7 @@ const MonthlyBudgetAnalysis = () => {
             {message}
           </div>
         )}
+
         <div>
           <MonthlyAnalysisTable data={tableData} />
         </div>
