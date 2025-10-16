@@ -53,8 +53,8 @@ const ProjectTable = ({ refreshProjects, data = [], onEditProject, onDeleteSubpr
     setLoading(`subproject-${subprojectId}`);
     try {
       const { data, status } = await deleteSubProject(selectedSubProject._id);
-      console.log("This is the status: ", status);
-      console.log("This is the data: ", data);
+      // console.log("This is the status: ", status);
+      // console.log("This is the data: ", data);
 
 
       if (status === 200) {
@@ -100,6 +100,11 @@ const ProjectTable = ({ refreshProjects, data = [], onEditProject, onDeleteSubpr
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider border-b">
                 Created On
               </th>
+
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider border-b">
+                Project Price
+              </th>
+
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider border-b">
                 Updated At
               </th>
@@ -109,96 +114,104 @@ const ProjectTable = ({ refreshProjects, data = [], onEditProject, onDeleteSubpr
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-200">
-            {data.map((project) => (
-              <tr key={project._id} className="hover:bg-gray-50 transition-colors">
-                <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                  {project.name}
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
+            {data.map((project) => {
+              {/* console.log("This is the one project: ", project); */ }
+              return (
+                <tr key={project._id} className="hover:bg-gray-50 transition-colors">
+                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                    {project.name}
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
 
-                  <span
-                    className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium 
+                    <span
+                      className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium 
     ${project.visibility === "visible"
-                        ? 'bg-green-100 text-green-800'
-                        : 'bg-blue-100 text-blue-800'}`}
-                  >
-                    {project.visibility}
-                  </span>
-                </td>
-                <td className="px-6 py-4 text-sm text-gray-600">
-                  {project.subprojects.length > 0 ? (
-                    <div className="flex flex-col gap-2">
-                      {project.subprojects.map((sub) => (
-                        <div key={sub._id} className="flex items-center gap-2">
-                          <span className="text-xs bg-blue-50 text-blue-700 px-2 py-1 rounded">
-                            {sub.name}
-                          </span>
-                          <button
-                            onClick={() => handleEditSubproject(project, sub)}
-                            className="p-1 text-blue-600 hover:text-blue-800 hover:bg-blue-100 rounded transition-colors"
-                            title="Edit subproject"
-                          >
-                            <Edit size={14} />
-                          </button>
-                          <button
-                            onClick={() => {
+                          ? 'bg-green-100 text-green-800'
+                          : 'bg-blue-100 text-blue-800'}`}
+                    >
+                      {project.visibility}
+                    </span>
+                  </td>
+                  <td className="px-6 py-4 text-sm text-gray-600">
+                    {project.subprojects.length > 0 ? (
+                      <div className="flex flex-col gap-2">
+                        {project.subprojects.map((sub) => (
+                          <div key={sub._id} className="flex items-center gap-2">
+                            <span className="text-xs bg-blue-50 text-blue-700 px-2 py-1 rounded">
+                              {sub.name}
+                            </span>
+                            <button
+                              onClick={() => handleEditSubproject(project, sub)}
+                              className="p-1 text-blue-600 hover:text-blue-800 hover:bg-blue-100 rounded transition-colors"
+                              title="Edit subproject"
+                            >
+                              <Edit size={14} />
+                            </button>
+                            <button
+                              onClick={() => {
 
-                              setSelectedProject(project);
-                              setSelectedSubProject(sub);
-                              setIsConfirmDeleteSubProjectModalOpen(true);
-                            }}
-                            disabled={loading === `subproject-${sub._id}`}
-                            className="p-1 text-red-600 hover:text-red-800 hover:bg-red-100 rounded transition-colors disabled:opacity-50"
-                            title="Delete subproject"
-                          >
-                            {loading === `subproject-${sub._id}` ? (
-                              <div className="w-3.5 h-3.5 border-2 border-red-600 border-t-transparent rounded-full animate-spin" />
-                            ) : (
-                              <Trash2 size={14} />
+                                setSelectedProject(project);
+                                setSelectedSubProject(sub);
+                                setIsConfirmDeleteSubProjectModalOpen(true);
+                              }}
+                              disabled={loading === `subproject-${sub._id}`}
+                              className="p-1 text-red-600 hover:text-red-800 hover:bg-red-100 rounded transition-colors disabled:opacity-50"
+                              title="Delete subproject"
+                            >
+                              {loading === `subproject-${sub._id}` ? (
+                                <div className="w-3.5 h-3.5 border-2 border-red-600 border-t-transparent rounded-full animate-spin" />
+                              ) : (
+                                <Trash2 size={14} />
 
-                            )}
-                          </button>
-                        </div>
-                      ))}
+                              )}
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <span className="text-gray-400 italic">No subprojects</span>
+                    )}
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
+                    {formatDate(project.created_on)}
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
+                    {project.flatrate}
+
+                  </td>
+
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
+                    {formatDate(project.updated_at)}
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => handleEditProject(project)}
+                        className="p-2 text-blue-600 hover:text-blue-800 hover:bg-blue-100 rounded transition-colors"
+                        title="Edit project"
+                      >
+                        <Edit size={16} />
+                      </button>
+                      <button
+                        onClick={() => {
+                          setSelectedProject(project)
+                          setIsConfirmDeleteProjectModalOpen(true)
+                        }}
+                        disabled={loading === `project-${project._id}`}
+                        className="p-2 text-red-600 hover:text-red-800 hover:bg-red-100 rounded transition-colors disabled:opacity-50"
+                        title="Delete project"
+                      >
+                        {loading === `project-${project._id}` ? (
+                          <div className="w-4 h-4 border-2 border-red-600 border-t-transparent rounded-full animate-spin" />
+                        ) : (
+                          <Trash2 size={16} />
+                        )}
+                      </button>
                     </div>
-                  ) : (
-                    <span className="text-gray-400 italic">No subprojects</span>
-                  )}
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
-                  {formatDate(project.created_on)}
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
-                  {formatDate(project.updated_at)}
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
-                  <div className="flex gap-2">
-                    <button
-                      onClick={() => handleEditProject(project)}
-                      className="p-2 text-blue-600 hover:text-blue-800 hover:bg-blue-100 rounded transition-colors"
-                      title="Edit project"
-                    >
-                      <Edit size={16} />
-                    </button>
-                    <button
-                      onClick={() => {
-                        setSelectedProject(project)
-                        setIsConfirmDeleteProjectModalOpen(true)
-                      }}
-                      disabled={loading === `project-${project._id}`}
-                      className="p-2 text-red-600 hover:text-red-800 hover:bg-red-100 rounded transition-colors disabled:opacity-50"
-                      title="Delete project"
-                    >
-                      {loading === `project-${project._id}` ? (
-                        <div className="w-4 h-4 border-2 border-red-600 border-t-transparent rounded-full animate-spin" />
-                      ) : (
-                        <Trash2 size={16} />
-                      )}
-                    </button>
-                  </div>
-                </td>
-              </tr>
-            ))}
+                  </td>
+                </tr>
+              )
+            })}
           </tbody>
         </table>
         <ConfirmDeleteProjectModal

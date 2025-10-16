@@ -17,7 +17,7 @@ const navItems = [
   { name: "Projects", icon: FolderIcon, path: "/projects" },
   { name: "Resources", icon: UsersIcon, path: "/resources" },
   { name: "Productivity", icon: FaChartBar, path: "/productivity" },
-  { name: "Billing", icon: CurrencyDollarIcon, path: "/billing" },
+  { name: "Consting", icon: CurrencyDollarIcon, path: "/costing" },
   { name: "Invoices", icon: Cog6ToothIcon, path: "/invoices" },
   { name: "Master Database", icon: FiDatabase, path: "/masterdatabase" },
   { name: "Settings", icon: CiSettings, path: "/settings" },

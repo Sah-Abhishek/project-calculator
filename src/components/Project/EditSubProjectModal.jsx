@@ -10,7 +10,7 @@ const EditSubProjectModal = ({ isOpen, onClose, project, subProject, allProjects
   const [status, setStatus] = useState('Active');
   const [description, setDescription] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  console.log("This is the parent project name: ", project._id);
+  // console.log("This is the parent project name: ", project._id);
 
   useEffect(() => {
     if (subProject) {

@@ -5,7 +5,7 @@ import ProjectPage from "./pages/Project";
 import Layout from "./Layout";
 import Productivity from "./pages/Productivity";
 import Calculator from "./pages/Calculator";
-import BillingPage from "./pages/Billing";
+import Costing from "./pages/Costing";
 import ResourcesPage from "./pages/Resources";
 import MasterDatabase from "./pages/MasterDatabase";
 import Invoices from "./pages/Invoices";
@@ -24,7 +24,7 @@ const AppRoutes = () => {
           <Route path="/" element={<Calculator />} />
           <Route path="/projects" element={<ProjectPage />} />
           <Route path="/productivity" element={<Productivity />} />
-          <Route path="/billing" element={<BillingPage />} />
+          <Route path="/costing" element={<Costing />} />
           <Route path="/resources" element={<ResourcesPage />} />
           <Route path="/masterdatabase" element={<MasterDatabase />} />
           <Route path="/invoices" element={<Invoices />} />

@@ -1,7 +1,7 @@
 import api from "../api";
 
-export const createProject = async (projectName, isVisible, desc) => {
-  const response = await api.post("/project", { name: projectName, visibility: isVisible, description: desc });
+export const createProject = async (projectName, projectPrice, isVisible, desc) => {
+  const response = await api.post("/project", { name: projectName, projectPrice, visibility: isVisible, description: desc });
   return {
     data: response.data,
     status: response.status
