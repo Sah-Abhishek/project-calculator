@@ -42,7 +42,7 @@ const ProjectPage = () => {
 
     try {
       toast.loading("Uploading CSV...");
-      const res = await axios.post(`${import.meta.env.VITE_BACKEND_URL}/api/project/upload-csv`, formData, {
+      const res = await axios.post(`${import.meta.env.VITE_BACKEND_URL}/api/projects/bulk-upload`, formData, {
         headers: {
           "Content-Type": "multipart/form-data",
         },
