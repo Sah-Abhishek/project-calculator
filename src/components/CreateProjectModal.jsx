@@ -63,7 +63,7 @@ const CreateProjectModal = ({ isOpen, onClose, refreshProjects }) => {
 
           <div>
             <div className="flex-1">
-              <label className="block text-sm font-medium text-gray-700 mb-1">Project Price</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Project Price ($)</label>
               <input
                 type="number"
                 value={projectPrice}

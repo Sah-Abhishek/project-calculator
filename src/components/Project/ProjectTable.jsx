@@ -102,7 +102,7 @@ const ProjectTable = ({ refreshProjects, data = [], onEditProject, onDeleteSubpr
               </th>
 
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider border-b">
-                Project Price
+                Billing ($)
               </th>
 
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-700 uppercase tracking-wider border-b">
@@ -176,7 +176,7 @@ const ProjectTable = ({ refreshProjects, data = [], onEditProject, onDeleteSubpr
                     {formatDate(project.created_on)}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
-                    {project.flatrate}
+                    ${project.flatrate}
 
                   </td>
 

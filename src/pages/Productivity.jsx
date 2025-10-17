@@ -371,9 +371,8 @@ export default function Productivity() {
                           >
                             <PencilSquareIcon className="w-5 h-5" />
                           </button>
-                          <button className="text-red-600 hover:text-red-800" title="Delete">
-                            <TrashIcon className="w-5 h-5" />
-                          </button>
+                          {/* <button className="text-red-600 hover:text-red-800" title="Delete"> <TrashIcon className="w-5 h-5" /> */}
+                          {/* </button> */}
                         </div>
                       </td>
                     </tr>

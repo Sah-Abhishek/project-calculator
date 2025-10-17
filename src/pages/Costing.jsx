@@ -9,6 +9,8 @@ const PageHeader = ({ heading, subHeading }) => (
 );
 
 // This component now uses API calls instead of initial dummy data.
+// FIX: Using http://localhost:3000/api as a standard default placeholder for a running API service.
+// *** IMPORTANT: Update this string with your actual API base URL. ***
 const apiBaseUrl = import.meta.env.VITE_BACKEND_URL;
 
 const Costing = () => {
@@ -160,7 +162,7 @@ const Costing = () => {
                 billingId: billing._id,
                 hours: billing.hours,
                 rate: billing.rate,
-                flatrate: billing.flatrate ?? projectInfo.flatrate ?? 0,
+                flatrate: projectInfo.flatrate ?? 0, // MODIFIED: Always use project flatrate
                 productivity: billing.productivity_level,
                 description: billing.description || '',
                 isBillable: billing.billable_status === 'Billable'
@@ -216,7 +218,7 @@ const Costing = () => {
             billingId: billing._id,
             hours: billing.hours,
             rate: billing.rate,
-            flatrate: billing.flatrate ?? projectInfo.flatrate ?? 0,
+            flatrate: projectInfo.flatrate ?? 0, // MODIFIED: Always use project flatrate
             productivity: billing.productivity_level,
             description: billing.description || '',
             isBillable: billing.billable_status === 'Billable',
@@ -319,7 +321,7 @@ const Costing = () => {
               billingId: billing._id,
               hours: billing.hours,
               rate: billing.rate, // Internal Cost Rate
-              flatrate: billing.flatrate ?? projectFlatRate, // Project Flat Rate
+              flatrate: projectFlatRate, // MODIFIED: Always use project flatrate
               productivity: billing.productivity_level,
               description: billing.description || '',
               isBillable: billing.billable_status === 'Billable'
@@ -353,7 +355,7 @@ const Costing = () => {
             billingId: billing._id,
             hours: billing.hours,
             rate: billing.rate, // Internal Cost Rate
-            flatrate: billing.flatrate ?? projectFlatRate, // Project Flat Rate
+            flatrate: projectFlatRate, // MODIFIED: Always use project flatrate
             productivity: billing.productivity_level,
             description: billing.description || '',
             isBillable: billing.billable_status === 'Billable',
