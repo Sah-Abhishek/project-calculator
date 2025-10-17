@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 
 // Assume PageHeader is correctly defined or removed if not needed in the single file structure
 const PageHeader = ({ heading, subHeading }) => (
@@ -9,9 +9,7 @@ const PageHeader = ({ heading, subHeading }) => (
 );
 
 // This component now uses API calls instead of initial dummy data.
-// FIX: Using http://localhost:8080 as a standard default placeholder for a running API service.
-// *** IMPORTANT: Update this string with your actual API base URL. ***
-const apiBaseUrl = import.meta.env.VITE_BACKEND_URL || 'http://localhost:3000/api';
+const apiBaseUrl = import.meta.env.VITE_BACKEND_URL;
 
 const Costing = () => {
   // State for managing filters, data, and UI
@@ -65,261 +63,104 @@ const Costing = () => {
     fetchProjects();
   }, []);
 
-
-  useEffect(() => {
+  const fetchBillingData = useCallback(async () => {
     const { project, subProject, month, year } = filters;
 
-    const fetchBillingData = async () => {
-      if (projectsData.length === 0 || subprojects.length === 0) {
-        return;
-      }
+    if (projectsData.length === 0 || subprojects.length === 0) {
+      return;
+    }
 
-      // Determine which subprojects to load productivity rates for.
-      let subprojectIdsToFetchRates = [];
-      if (subProject) {
-        subprojectIdsToFetchRates = [subProject];
-      } else {
-        // All projects view: fetch rates for all subprojects
-        subprojectIdsToFetchRates = subprojects.flatMap(p => (p.subprojects || []).map(sp => sp._id));
-      }
+    // Determine which subprojects to load productivity rates for.
+    let subprojectIdsToFetchRates = [];
+    if (subProject) {
+      subprojectIdsToFetchRates = [subProject];
+    } else {
+      // All projects view: fetch rates for all subprojects
+      subprojectIdsToFetchRates = subprojects.flatMap(p => (p.subprojects || []).map(sp => sp._id));
+    }
 
-      // Fetch all productivity rates required
-      const productivityPromises = subprojectIdsToFetchRates.map(spId =>
-        fetch(`${apiBaseUrl}/productivity?subproject_id=${spId}`).then(res => res.ok ? res.json() : [])
-      );
-      const allProductivityRatesNested = await Promise.all(productivityPromises);
-      const ratesMap = subprojectIdsToFetchRates.reduce((acc, spId, index) => {
-        acc[spId] = allProductivityRatesNested[index];
-        return acc;
-      }, {});
-      setProductivityRatesMap(ratesMap);
+    // Fetch all productivity rates required
+    const productivityPromises = subprojectIdsToFetchRates.map(spId =>
+      fetch(`${apiBaseUrl}/productivity?subproject_id=${spId}`).then(res => res.ok ? res.json() : [])
+    );
+    const allProductivityRatesNested = await Promise.all(productivityPromises);
+    const ratesMap = subprojectIdsToFetchRates.reduce((acc, spId, index) => {
+      acc[spId] = allProductivityRatesNested[index];
+      return acc;
+    }, {});
+    setProductivityRatesMap(ratesMap);
 
-      const allSubprojectsFlat = subprojects.flatMap(p => p.subprojects || []);
+    const allSubprojectsFlat = subprojects.flatMap(p => p.subprojects || []);
 
-      if (!project) {
-        // --- ALL PROJECTS VIEW (Combined Active Assignments + Monthly Records) ---
-        setIsLoading(true);
-        setIsDataLoaded(false);
-        setInvoiceInfo(null);
-        setResources([]);
-        try {
-          // Fetch ALL resources
-          const resourcesRes = await fetch(`${apiBaseUrl}/resource`);
-          if (!resourcesRes.ok) throw new Error('Could not fetch resources.');
-          const allResources = await resourcesRes.json();
-          const allResourcesMap = new Map(allResources.map(r => [r._id, r])); // Map for quick lookup
+    if (!project) {
+      // --- ALL PROJECTS VIEW (Combined Active Assignments + Monthly Records) ---
+      setIsLoading(true);
+      setIsDataLoaded(false);
+      setInvoiceInfo(null);
+      setResources([]);
+      try {
+        // Fetch ALL resources
+        const resourcesRes = await fetch(`${apiBaseUrl}/resource`);
+        if (!resourcesRes.ok) throw new Error('Could not fetch resources.');
+        const allResources = await resourcesRes.json();
+        const allResourcesMap = new Map(allResources.map(r => [r._id, r])); // Map for quick lookup
 
-          // Fetch ALL billing records for the CURRENT month/year AND records with NULL month
-          const currentMonthBillingRes = await fetch(`${apiBaseUrl}/billing?month=${month}&year=${year}`);
-          if (!currentMonthBillingRes.ok) throw new Error('Could not fetch current month billing records.');
-          const currentMonthBillingRecords = await currentMonthBillingRes.json();
+        // Fetch ALL billing records for the CURRENT month/year AND records with NULL month
+        const currentMonthBillingRes = await fetch(`${apiBaseUrl}/billing?month=${month}&year=${year}`);
+        if (!currentMonthBillingRes.ok) throw new Error('Could not fetch current month billing records.');
+        const currentMonthBillingRecords = await currentMonthBillingRes.json();
 
-          const nullMonthBillingRes = await fetch(`${apiBaseUrl}/billing?month=null`);
-          if (!nullMonthBillingRes.ok) throw new Error('Could not fetch initial billing records.');
-          const nullMonthBillingRecords = await nullMonthBillingRes.json();
+        const nullMonthBillingRes = await fetch(`${apiBaseUrl}/billing?month=null`);
+        if (!nullMonthBillingRes.ok) throw new Error('Could not fetch initial billing records.');
+        const nullMonthBillingRecords = await nullMonthBillingRes.json();
 
-          // Combine monthly records and initial (null month) records, prioritizing monthly records
-          const billingRecordsMap = new Map();
+        // Combine monthly records and initial (null month) records, prioritizing monthly records
+        const billingRecordsMap = new Map();
 
-          // 1. Add current month records (highest priority)
-          currentMonthBillingRecords.forEach(billing => {
-            const key = `${billing.subproject_id?._id || billing.subproject_id}-${billing.resource_id}`;
+        // 1. Add current month records (highest priority)
+        currentMonthBillingRecords.forEach(billing => {
+          const key = `${billing.subproject_id?._id || billing.subproject_id}-${billing.resource_id}`;
+          billingRecordsMap.set(key, billing);
+        });
+
+        // 2. Add null month records if no monthly record exists yet for that subproject/resource
+        nullMonthBillingRecords.forEach(billing => {
+          const key = `${billing.subproject_id?._id || billing.subproject_id}-${billing.resource_id}`;
+          if (!billingRecordsMap.has(key)) {
             billingRecordsMap.set(key, billing);
-          });
+          }
+        });
 
-          // 2. Add null month records if no monthly record exists yet for that subproject/resource
-          nullMonthBillingRecords.forEach(billing => {
-            const key = `${billing.subproject_id?._id || billing.subproject_id}-${billing.resource_id}`;
-            if (!billingRecordsMap.has(key)) {
-              billingRecordsMap.set(key, billing);
+        const finalDataMap = new Map();
+
+        // Pass 1: Active Assignments (Current Resources)
+        // Only iterates over EXISTING resources
+        allResources.forEach(resource => {
+          (resource.assigned_subprojects || []).forEach(assignedSubproject => {
+            let projectInfo, subProjectInfo;
+            for (const p of subprojects) {
+              const sp = (p.subprojects || []).find(s => s._id === assignedSubproject._id);
+              if (sp) { projectInfo = p; subProjectInfo = sp; break; }
             }
-          });
-
-          const finalDataMap = new Map();
-
-          // Pass 1: Active Assignments (Current Resources)
-          // Only iterates over EXISTING resources
-          allResources.forEach(resource => {
-            (resource.assigned_subprojects || []).forEach(assignedSubproject => {
-              let projectInfo, subProjectInfo;
-              for (const p of subprojects) {
-                const sp = (p.subprojects || []).find(s => s._id === assignedSubproject._id);
-                if (sp) { projectInfo = p; subProjectInfo = sp; break; }
-              }
-              if (!projectInfo || !subProjectInfo) return;
-
-              const subprojectId = subProjectInfo._id;
-              const uniqueKey = `${subprojectId}-${resource._id}`;
-
-              const billing = billingRecordsMap.get(uniqueKey);
-              const ratesForSubproject = ratesMap[subprojectId] || [];
-
-              let rowData;
-              const defaultProductivity = 'Medium';
-              const rateRecord = ratesForSubproject.find(r => r.level.toLowerCase() === defaultProductivity.toLowerCase());
-
-              if (billing) {
-                rowData = {
-                  ...resource,
-                  billingId: billing._id,
-                  hours: billing.hours,
-                  rate: billing.rate,
-                  flatrate: billing.flatrate || resource.flatrate || 0,
-                  productivity: billing.productivity_level,
-                  description: billing.description || '',
-                  isBillable: billing.billable_status === 'Billable'
-                };
-              } else {
-                rowData = {
-                  ...resource,
-                  billingId: null,
-                  hours: 0,
-                  rate: rateRecord?.base_rate ?? 0,
-                  flatrate: resource.flatrate || 0,
-                  productivity: defaultProductivity,
-                  description: '',
-                  isBillable: true
-                };
-              }
-
-              finalDataMap.set(uniqueKey, {
-                ...rowData,
-                uniqueId: `${projectInfo._id}-${subprojectId}-${resource._id}`,
-                projectName: projectInfo.name,
-                subProjectName: subProjectInfo.name,
-                projectId: projectInfo._id,
-                subprojectId: subprojectId,
-                isEditable: true
-              });
-            });
-          });
-
-          // Pass 2: Historical/Orphaned Records (Handles Unassigned Existing and Deleted Resources)
-          // We iterate over the combined map to catch all records not covered in Pass 1.
-          billingRecordsMap.forEach(billing => {
-            const subprojectId = billing.subproject_id?._id || billing.subproject_id;
-            const uniqueKey = `${subprojectId}-${billing.resource_id}`;
-
-            // 1. Skip if already handled by an active assignment (Pass 1)
-            if (finalDataMap.has(uniqueKey)) return;
-
-            // 2. Only show records that were explicitly billed (month != null).
-            // This filters out auto-generated placeholders (month == null) for all unassigned/deleted resources.
-            if (billing.month === null) return;
-
-            // 3. Find resource info
-            const resourceInfo = allResourcesMap.get(billing.resource_id);
-
-            // Fetch Project/Subproject info (required for display regardless of resource status)
-            let projectInfo = subprojects.find(p => (p.subprojects || []).some(sp => sp._id === subprojectId));
-            let subProjectInfo = allSubprojectsFlat.find(sp => sp._id === subprojectId);
             if (!projectInfo || !subProjectInfo) return;
 
-            const baseRecord = {
-              uniqueId: `${projectInfo._id}-${subprojectId}-${billing.resource_id}`,
-              billingId: billing._id,
-              hours: billing.hours,
-              rate: billing.rate,
-              flatrate: billing.flatrate,
-              productivity: billing.productivity_level,
-              description: billing.description || '',
-              isBillable: billing.billable_status === 'Billable',
-              projectName: projectInfo.name,
-              subProjectName: subProjectInfo.name,
-              projectId: projectInfo._id,
-              subprojectId: subprojectId,
-              isEditable: false // Historical records are always non-editable
-            };
+            const subprojectId = subProjectInfo._id;
+            const uniqueKey = `${subprojectId}-${resource._id}`;
 
-            if (!resourceInfo) {
-              // DELETED Resource (Orphaned Record) - Use denormalized data
-              finalDataMap.set(uniqueKey, {
-                ...baseRecord,
-                name: billing.resource_name || `Deleted Resource (${billing.resource_id})`,
-                avatar_url: 'https://placehold.co/40x40/f3f4f6/374151?text=DLT', // Placeholder avatar
-                role: 'N/A',
-              });
-            } else {
-              // Existing but Unassigned Resource (Historical Record)
-              finalDataMap.set(uniqueKey, {
-                ...resourceInfo,
-                ...baseRecord
-              });
-            }
-          });
+            const billing = billingRecordsMap.get(uniqueKey);
+            const ratesForSubproject = ratesMap[subprojectId] || [];
 
-          setResources(Array.from(finalDataMap.values()));
-          setIsDataLoaded(true);
-          if (finalDataMap.size > 0) showToast('All project data loaded!');
-
-        } catch (error) {
-          console.error("Error loading linked resource data:", error);
-          showToast(error.message, 'error');
-        } finally {
-          setIsLoading(false);
-        }
-      } else if (project && subProject) {
-        // --- FILTERED VIEW LOGIC (Specific Subproject) ---
-        setIsLoading(true);
-        setIsDataLoaded(false);
-        setInvoiceInfo(null);
-        setResources([]);
-        try {
-          const [productivityRes, resourcesRes] = await Promise.all([
-            fetch(`${apiBaseUrl}/productivity?subproject_id=${subProject}`),
-            fetch(`${apiBaseUrl}/resource`)
-          ]);
-
-          if (!productivityRes.ok) throw new Error('Could not fetch productivity rates.');
-          if (!resourcesRes.ok) throw new Error('Could not fetch resources.');
-
-          const ratesData = await productivityRes.json();
-          const allResources = await resourcesRes.json();
-          const allResourcesMap = new Map(allResources.map(r => [r._id, r]));
-          setProductivityRatesMap({ [subProject]: ratesData });
-
-          const linkedResources = allResources.filter(r => (r.assigned_subprojects || []).some(sp => sp._id === subProject));
-
-          // Fetch billing records for the specific month/year AND the initial null month records for this subproject
-          const monthlyParams = new URLSearchParams({ subproject_id: subProject, month, year });
-          const nullMonthParams = new URLSearchParams({ subproject_id: subProject, month: 'null' });
-
-          const [monthlyBillingRes, nullMonthBillingRes] = await Promise.all([
-            fetch(`${apiBaseUrl}/billing?${monthlyParams.toString()}`),
-            fetch(`${apiBaseUrl}/billing?${nullMonthParams.toString()}`)
-          ]);
-
-          if (!monthlyBillingRes.ok || !nullMonthBillingRes.ok) throw new Error('Could not fetch billing data.');
-
-          const monthlyBillingRecords = await monthlyBillingRes.json();
-          const nullMonthBillingRecords = await nullMonthBillingRes.json();
-
-          // Combine records, prioritizing monthly records
-          const billingRecordsMap = new Map();
-          monthlyBillingRecords.forEach(billing => billingRecordsMap.set(billing.resource_id, billing));
-          nullMonthBillingRecords.forEach(billing => {
-            if (!billingRecordsMap.has(billing.resource_id)) {
-              billingRecordsMap.set(billing.resource_id, billing);
-            }
-          });
-
-          const finalDataMap = new Map();
-
-          // Pass 1: Current Assignments (Editable)
-          linkedResources.forEach(resource => {
-            const billing = billingRecordsMap.get(resource._id);
             let rowData;
-
             const defaultProductivity = 'Medium';
-            const rateRecord = ratesData.find(r => r.level.toLowerCase() === defaultProductivity.toLowerCase());
+            const rateRecord = ratesForSubproject.find(r => r.level.toLowerCase() === defaultProductivity.toLowerCase());
 
             if (billing) {
               rowData = {
                 ...resource,
                 billingId: billing._id,
                 hours: billing.hours,
-                rate: billing.rate, // Internal Cost Rate
-                flatrate: billing.flatrate || resource.flatrate || 0, // Project Flat Rate
+                rate: billing.rate,
+                flatrate: billing.flatrate ?? projectInfo.flatrate ?? 0,
                 productivity: billing.productivity_level,
                 description: billing.description || '',
                 isBillable: billing.billable_status === 'Billable'
@@ -329,74 +170,235 @@ const Costing = () => {
                 ...resource,
                 billingId: null,
                 hours: 0,
-                rate: rateRecord?.base_rate ?? 0, // Default Internal Cost Rate
-                flatrate: resource.flatrate || 0, // Project Flat Rate
+                rate: rateRecord?.base_rate ?? 0,
+                flatrate: projectInfo.flatrate ?? 0,
                 productivity: defaultProductivity,
                 description: '',
                 isBillable: true
               };
             }
-            finalDataMap.set(resource._id, { ...rowData, uniqueId: `${project}-${subProject}-${resource._id}`, projectId: project, subprojectId: subProject, isEditable: true });
+
+            finalDataMap.set(uniqueKey, {
+              ...rowData,
+              uniqueId: `${projectInfo._id}-${subprojectId}-${resource._id}`,
+              projectName: projectInfo.name,
+              subProjectName: subProjectInfo.name,
+              projectId: projectInfo._id,
+              subprojectId: subprojectId,
+              isEditable: true
+            });
           });
+        });
 
+        // Pass 2: Historical/Orphaned Records (Handles Unassigned Existing and Deleted Resources)
+        // We iterate over the combined map to catch all records not covered in Pass 1.
+        billingRecordsMap.forEach(billing => {
+          const subprojectId = billing.subproject_id?._id || billing.subproject_id;
+          const uniqueKey = `${subprojectId}-${billing.resource_id}`;
 
-          // Pass 2: Historical/Orphaned Records (Non-Editable)
-          monthlyBillingRecords.forEach(billing => {
-            // 1. Skip if already handled by an active assignment (Pass 1)
-            if (finalDataMap.has(billing.resource_id)) return;
+          // 1. Skip if already handled by an active assignment (Pass 1)
+          if (finalDataMap.has(uniqueKey)) return;
 
-            // 2. Resource info
-            const resourceInfo = allResourcesMap.get(billing.resource_id);
+          // 2. Only show records that were explicitly billed (month != null).
+          // This filters out auto-generated placeholders (month == null) for all unassigned/deleted resources.
+          if (billing.month === null) return;
 
-            const baseRecord = {
-              uniqueId: `${project}-${subProject}-${billing.resource_id}`,
+          // 3. Find resource info
+          const resourceInfo = allResourcesMap.get(billing.resource_id);
+
+          // Fetch Project/Subproject info (required for display regardless of resource status)
+          let projectInfo = subprojects.find(p => (p.subprojects || []).some(sp => sp._id === subprojectId));
+          let subProjectInfo = allSubprojectsFlat.find(sp => sp._id === subprojectId);
+          if (!projectInfo || !subProjectInfo) return;
+
+          const baseRecord = {
+            uniqueId: `${projectInfo._id}-${subprojectId}-${billing.resource_id}`,
+            billingId: billing._id,
+            hours: billing.hours,
+            rate: billing.rate,
+            flatrate: billing.flatrate ?? projectInfo.flatrate ?? 0,
+            productivity: billing.productivity_level,
+            description: billing.description || '',
+            isBillable: billing.billable_status === 'Billable',
+            projectName: projectInfo.name,
+            subProjectName: subProjectInfo.name,
+            projectId: projectInfo._id,
+            subprojectId: subprojectId,
+            isEditable: false // Historical records are always non-editable
+          };
+
+          if (!resourceInfo) {
+            // DELETED Resource (Orphaned Record) - Use denormalized data
+            finalDataMap.set(uniqueKey, {
+              ...baseRecord,
+              name: billing.resource_name || `Deleted Resource (${billing.resource_id})`,
+              avatar_url: 'https://placehold.co/40x40/f3f4f6/374151?text=DLT', // Placeholder avatar
+              role: 'N/A',
+            });
+          } else {
+            // Existing but Unassigned Resource (Historical Record)
+            finalDataMap.set(uniqueKey, {
+              ...resourceInfo,
+              ...baseRecord
+            });
+          }
+        });
+
+        setResources(Array.from(finalDataMap.values()));
+        setIsDataLoaded(true);
+        if (finalDataMap.size > 0) showToast('All project data loaded!');
+
+      } catch (error) {
+        console.error("Error loading linked resource data:", error);
+        showToast(error.message, 'error');
+      } finally {
+        setIsLoading(false);
+      }
+    } else if (project && subProject) {
+      // --- FILTERED VIEW LOGIC (Specific Subproject) ---
+      setIsLoading(true);
+      setIsDataLoaded(false);
+      setInvoiceInfo(null);
+      setResources([]);
+      try {
+        const [productivityRes, resourcesRes] = await Promise.all([
+          fetch(`${apiBaseUrl}/productivity?subproject_id=${subProject}`),
+          fetch(`${apiBaseUrl}/resource`)
+        ]);
+
+        if (!productivityRes.ok) throw new Error('Could not fetch productivity rates.');
+        if (!resourcesRes.ok) throw new Error('Could not fetch resources.');
+
+        // FIX: Get the selected project from projectsData to access its flatrate
+        const selectedProject = projectsData.find(p => p._id === project);
+        const projectFlatRate = selectedProject?.flatrate ?? 0;
+
+        const ratesData = await productivityRes.json();
+        const allResources = await resourcesRes.json();
+        const allResourcesMap = new Map(allResources.map(r => [r._id, r]));
+        setProductivityRatesMap({ [subProject]: ratesData });
+
+        const linkedResources = allResources.filter(r => (r.assigned_subprojects || []).some(sp => sp._id === subProject));
+
+        // Fetch billing records for the specific month/year AND the initial null month records for this subproject
+        const monthlyParams = new URLSearchParams({ subproject_id: subProject, month, year });
+        const nullMonthParams = new URLSearchParams({ subproject_id: subProject, month: 'null' });
+
+        const [monthlyBillingRes, nullMonthBillingRes] = await Promise.all([
+          fetch(`${apiBaseUrl}/billing?${monthlyParams.toString()}`),
+          fetch(`${apiBaseUrl}/billing?${nullMonthParams.toString()}`)
+        ]);
+
+        if (!monthlyBillingRes.ok || !nullMonthBillingRes.ok) throw new Error('Could not fetch billing data.');
+
+        const monthlyBillingRecords = await monthlyBillingRes.json();
+        const nullMonthBillingRecords = await nullMonthBillingRes.json();
+
+        // Combine records, prioritizing monthly records
+        const billingRecordsMap = new Map();
+        monthlyBillingRecords.forEach(billing => billingRecordsMap.set(billing.resource_id, billing));
+        nullMonthBillingRecords.forEach(billing => {
+          if (!billingRecordsMap.has(billing.resource_id)) {
+            billingRecordsMap.set(billing.resource_id, billing);
+          }
+        });
+
+        const finalDataMap = new Map();
+
+        // Pass 1: Current Assignments (Editable)
+        linkedResources.forEach(resource => {
+          const billing = billingRecordsMap.get(resource._id);
+          let rowData;
+
+          const defaultProductivity = 'Medium';
+          const rateRecord = ratesData.find(r => r.level.toLowerCase() === defaultProductivity.toLowerCase());
+
+          if (billing) {
+            rowData = {
+              ...resource,
               billingId: billing._id,
               hours: billing.hours,
               rate: billing.rate, // Internal Cost Rate
-              flatrate: billing.flatrate, // Project Flat Rate
+              flatrate: billing.flatrate ?? projectFlatRate, // Project Flat Rate
               productivity: billing.productivity_level,
               description: billing.description || '',
-              isBillable: billing.billable_status === 'Billable',
-              projectId: project,
-              subprojectId: subProject,
-              isEditable: false
+              isBillable: billing.billable_status === 'Billable'
             };
-
-            if (!resourceInfo) {
-              // DELETED Resource (Orphaned Record) - Use denormalized data
-              finalDataMap.set(billing.resource_id, {
-                ...baseRecord,
-                name: billing.resource_name || `Deleted Resource (${billing.resource_id})`,
-                avatar_url: 'https://placehold.co/40x40/f3f4f6/374151?text=DLT', // Placeholder avatar
-                role: 'N/A',
-              });
-            } else {
-              // Existing but Unassigned Resource (Historical Record)
-              finalDataMap.set(billing.resource_id, {
-                ...resourceInfo,
-                ...baseRecord
-              });
-            }
-          });
+          } else {
+            rowData = {
+              ...resource,
+              billingId: null,
+              hours: 0,
+              rate: rateRecord?.base_rate ?? 0, // Default Internal Cost Rate
+              flatrate: projectFlatRate, // Project Flat Rate
+              productivity: defaultProductivity,
+              description: '',
+              isBillable: true
+            };
+          }
+          finalDataMap.set(resource._id, { ...rowData, uniqueId: `${project}-${subProject}-${resource._id}`, projectId: project, subprojectId: subProject, isEditable: true });
+        });
 
 
-          setResources(Array.from(finalDataMap.values()));
-          setIsDataLoaded(true);
-          showToast('Billing data loaded successfully!');
-        } catch (error) {
-          console.error("Error loading billing data:", error);
-          showToast(error.message, 'error');
-        } finally {
-          setIsLoading(false);
-        }
-      } else {
-        setResources([]);
-        setProductivityRatesMap({});
-        setIsDataLoaded(false);
+        // Pass 2: Historical/Orphaned Records (Non-Editable)
+        monthlyBillingRecords.forEach(billing => {
+          // 1. Skip if already handled by an active assignment (Pass 1)
+          if (finalDataMap.has(billing.resource_id)) return;
+
+          // 2. Resource info
+          const resourceInfo = allResourcesMap.get(billing.resource_id);
+
+          const baseRecord = {
+            uniqueId: `${project}-${subProject}-${billing.resource_id}`,
+            billingId: billing._id,
+            hours: billing.hours,
+            rate: billing.rate, // Internal Cost Rate
+            flatrate: billing.flatrate ?? projectFlatRate, // Project Flat Rate
+            productivity: billing.productivity_level,
+            description: billing.description || '',
+            isBillable: billing.billable_status === 'Billable',
+            projectId: project,
+            subprojectId: subProject,
+            isEditable: false
+          };
+
+          if (!resourceInfo) {
+            // DELETED Resource (Orphaned Record) - Use denormalized data
+            finalDataMap.set(billing.resource_id, {
+              ...baseRecord,
+              name: billing.resource_name || `Deleted Resource (${billing.resource_id})`,
+              avatar_url: 'https://placehold.co/40x40/f3f4f6/374151?text=DLT', // Placeholder avatar
+              role: 'N/A',
+            });
+          } else {
+            // Existing but Unassigned Resource (Historical Record)
+            finalDataMap.set(billing.resource_id, {
+              ...resourceInfo,
+              ...baseRecord
+            });
+          }
+        });
+
+
+        setResources(Array.from(finalDataMap.values()));
+        setIsDataLoaded(true);
+        showToast('Billing data loaded successfully!');
+      } catch (error) {
+        console.error("Error loading billing data:", error);
+        showToast(error.message, 'error');
+      } finally {
+        setIsLoading(false);
       }
-    };
-    fetchBillingData();
+    } else {
+      setResources([]);
+      setProductivityRatesMap({});
+      setIsDataLoaded(false);
+    }
   }, [filters, projectsData, subprojects]);
+
+  useEffect(() => {
+    fetchBillingData();
+  }, [fetchBillingData]);
 
 
   // Handler for filter changes
@@ -421,12 +423,22 @@ const Costing = () => {
 
   // Handler for changing resource hours, productivity, etc. inline
   const handleResourceChange = async (uniqueId, field, value) => {
-    const currentRates = productivityRatesMap[resources.find(r => r.uniqueId === uniqueId)?.subprojectId] || [];
-
     let targetResource = resources.find(r => r.uniqueId === uniqueId);
     if (!targetResource) return;
 
-    let newRes = { ...targetResource, [field]: value };
+    const originalResourceState = { ...targetResource };
+    const currentRates = productivityRatesMap[targetResource.subprojectId] || [];
+
+    // Ensure numeric fields are correctly parsed as numbers
+    let parsedValue = value;
+    if (field === 'hours') {
+      parsedValue = Number(value);
+      if (isNaN(parsedValue)) {
+        parsedValue = 0; // Default to 0 if input is not a valid number
+      }
+    }
+
+    let newRes = { ...targetResource, [field]: parsedValue };
 
     // Update internal cost rate if productivity changes
     if (field === 'productivity') {
@@ -434,7 +446,7 @@ const Costing = () => {
       newRes.rate = rateRecord ? rateRecord.base_rate : 0;
     }
 
-    // Update resources state
+    // Optimistically update the UI for a responsive feel
     const updatedResources = resources.map(res =>
       res.uniqueId === uniqueId ? newRes : res
     );
@@ -456,14 +468,12 @@ const Costing = () => {
       total_amount: totalAmount, // New calculated field
       description: newRes.description,
       billable_status: newRes.isBillable ? 'Billable' : 'Non-Billable',
-      // If billingId is the auto-generated one (originally null month), we update it to the selected month/year.
       month: filters.month,
       year: filters.year,
     };
 
     try {
       let response, data;
-      // If billingId exists, it's an update. If it was a null-month record, this PUT updates it to the current month.
       if (newRes.billingId) {
         response = await fetch(`${apiBaseUrl}/billing/${newRes.billingId}`, {
           method: 'PUT',
@@ -471,7 +481,6 @@ const Costing = () => {
           body: JSON.stringify(payload),
         });
       } else {
-        // This should primarily handle brand new resource entries not covered by auto-billing
         response = await fetch(`${apiBaseUrl}/billing`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -482,20 +491,26 @@ const Costing = () => {
       data = await response.json();
       if (!response.ok) throw new Error(data.message || 'Failed to save billing record');
 
+      // If it was a new record, update the state with the new billingId from the server
       if (!newRes.billingId) {
-        // Update the local state with the new billingId
         setResources(currentResources => currentResources.map(res =>
           res.uniqueId === uniqueId ? { ...res, billingId: data._id } : res
         ));
       }
       showToast('Billing record saved!');
+      await fetchBillingData(); // Re-fetch data to ensure UI is up-to-date
     } catch (error) {
       console.error('Error saving resource change:', error);
       showToast(error.message, 'error');
-      // Simple revert attempt for better UX if save fails
-      setResources(resources);
+      // On failure, revert the specific resource that was being edited
+      setResources(currentResources =>
+        currentResources.map(res =>
+          res.uniqueId === uniqueId ? originalResourceState : res
+        )
+      );
     }
   };
+
 
   // Function to handle saving billing and generating an invoice
   const handleSaveBilling = () => {
@@ -907,10 +922,10 @@ const Costing = () => {
                     <div className="text-xl font-bold text-red-700">{formatCurrency(totals.cost)}</div>
                   </div>
                   <div className="w-px h-12 bg-gray-200 hidden md:block"></div>
-                  {/* <div className="text-center"> */}
-                  {/*   <div className="flex items-center justify-center space-x-1 mb-1"><div className={`w-3 h-3 ${totals.grand >= 0 ? 'bg-green-500' : 'bg-orange-500'} rounded-full`}></div><div className={`text-xs ${totals.grand >= 0 ? 'text-green-600' : 'text-orange-600'} font-medium`}>Profit / Loss</div></div> */}
-                  {/*   <div className="text-xl font-bold text-gray-700">{formatCurrency(totals.grand)}</div> */}
-                  {/* </div> */}
+                  <div className="text-center">
+                    <div className="flex items-center justify-center space-x-1 mb-1"><div className={`w-3 h-3 ${totals.grand >= 0 ? 'bg-green-500' : 'bg-orange-500'} rounded-full`}></div><div className={`text-xs ${totals.grand >= 0 ? 'text-green-600' : 'text-orange-600'} font-medium`}>Profit / Loss</div></div>
+                    <div className="text-xl font-bold text-gray-700">{formatCurrency(totals.grand)}</div>
+                  </div>
                 </div>
                 <div className="flex items-center space-x-3">
                   <button onClick={handleSaveBilling} className="bg-green-500 text-white px-6 py-3 rounded-xl font-semibold hover:bg-green-600 hover:shadow-lg transition-all duration-200 transform hover:scale-105 flex items-center space-x-2">

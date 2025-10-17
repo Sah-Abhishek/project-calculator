@@ -335,7 +335,12 @@ export default function ResourcesPage() {
   const [subprojects, setSubprojects] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [modalState, setModalState] = useState({ type: null, data: null }); // type: 'add' or 'edit'
-  const [filters, setFilters] = useState({ project: '', subProject: '', billableStatus: '' });
+  const [filters, setFilters] = useState({
+    project: '',
+    subProject: '',
+    billableStatus: '',
+    search: '', // ✅ NEW
+  });
   const [subprojectOptions, setSubprojectOptions] = useState([]);
   const fetchData = async () => {
     setIsLoading(true);
@@ -419,13 +424,25 @@ export default function ResourcesPage() {
 
 
   const filteredResources = resources.filter(res => {
-    const { project, subProject, billableStatus } = filters;
+    const { project, subProject, billableStatus, search } = filters;
+
     if (project && !(res.assigned_projects || []).map(p => p._id).includes(project)) return false;
     if (subProject && !(res.assigned_subprojects || []).map(sp => sp._id).includes(subProject)) return false;
     if (billableStatus) {
       const isBillable = billableStatus === 'billable';
       if (res.isBillable !== isBillable) return false;
     }
+
+    // ✅ Search filter (case-insensitive)
+    if (search.trim()) {
+      const s = search.toLowerCase();
+      const matches =
+        res.name?.toLowerCase().includes(s) ||
+        res.email?.toLowerCase().includes(s) ||
+        res.role?.toLowerCase().includes(s);
+      if (!matches) return false;
+    }
+
     return true;
   });
 
@@ -460,30 +477,51 @@ export default function ResourcesPage() {
 
         <div id="filters-section" className="bg-white rounded-2xl shadow-lg p-6 mb-6">
           <div className="flex items-center justify-between">
-            <div className="grid grid-cols-3 gap-6 flex-1">
+            <div className="grid grid-cols-4 gap-6 flex-1"> {/* changed from 3 to 4 */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">Project</label>
-                <select name="project" value={filters.project} onChange={handleFilterChange} className="w-full border border-gray-300 rounded-xl px-4 py-2 focus:ring-2 focus:ring-primary focus:border-transparent">
+                <select
+                  name="project"
+                  value={filters.project}
+                  onChange={handleFilterChange}
+                  className="w-full border border-gray-300 rounded-xl px-4 py-2 focus:ring-2 focus:ring-primary focus:border-transparent"
+                >
                   <option value="">All Projects</option>
-                  {projects.map(p => <option key={p._id} value={p._id}>{p.name}</option>)}
+                  {projects.map(p => (
+                    <option key={p._id} value={p._id}>{p.name}</option>
+                  ))}
                 </select>
               </div>
+
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">Sub-Project</label>
-                <select name="subProject" value={filters.subProject} onChange={handleFilterChange} className="w-full border border-gray-300 rounded-xl px-4 py-2 focus:ring-2 focus:ring-primary focus:border-transparent">
+                <select
+                  name="subProject"
+                  value={filters.subProject}
+                  onChange={handleFilterChange}
+                  className="w-full border border-gray-300 rounded-xl px-4 py-2 focus:ring-2 focus:ring-primary focus:border-transparent"
+                >
                   <option value="">All Sub-Projects</option>
-                  {subprojectOptions.map(sp => <option key={sp._id} value={sp._id}>{sp.name}</option>)}
+                  {subprojectOptions.map(sp => (
+                    <option key={sp._id} value={sp._id}>{sp.name}</option>
+                  ))}
                 </select>
               </div>
-              {/* <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-2">Billable Status</label>
-                                <select name="billableStatus" value={filters.billableStatus} onChange={handleFilterChange} className="w-full border border-gray-300 rounded-xl px-4 py-2 focus:ring-2 focus:ring-primary focus:border-transparent">
-                                    <option value="">All</option>
-                                    <option value="billable">Billable</option>
-                                    <option value="non-billable">Non-Billable</option>
-                                </select>
-                            </div> */}
+
+              {/* ✅ NEW: Resource search */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Search Resource</label>
+                <input
+                  type="text"
+                  name="search"
+                  value={filters.search}
+                  onChange={handleFilterChange}
+                  placeholder="Search by name, role, or email..."
+                  className="w-full border border-gray-300 rounded-xl px-4 py-2 focus:ring-2 focus:ring-primary focus:border-transparent"
+                />
+              </div>
             </div>
+
             <div className="ml-6">
               <span className="inline-flex items-center px-3 py-2 rounded-full text-sm font-medium bg-gray-100 text-gray-800">
                 Total: {filteredResources.length} Resources
