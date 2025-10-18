@@ -8,8 +8,8 @@ export const createProject = async (projectName, projectPrice, isVisible, desc) 
   };
 };
 
-export const createSubProject = async (subProjectName, parentProjectId, desc) => {
-  const response = await api.post("/project/sub-project", { name: subProjectName, project_id: parentProjectId, description: desc });
+export const createSubProject = async (subProjectName, subProjectPrice, parentProjectId, desc) => {
+  const response = await api.post("/project/sub-project", { name: subProjectName, subProjectPrice, project_id: parentProjectId, description: desc });
   // console.log("This is the parentprojectId", parentProjectId);
   return {
     data: response.data,

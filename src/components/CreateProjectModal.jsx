@@ -62,17 +62,17 @@ const CreateProjectModal = ({ isOpen, onClose, refreshProjects }) => {
           </div>
 
           <div>
-            <div className="flex-1">
-              <label className="block text-sm font-medium text-gray-700 mb-1">Project Price ($)</label>
-              <input
-                type="number"
-                value={projectPrice}
-                placeholder="Project Price"
-                onChange={(e) => setProjectPrice(e.target.value)}
-                className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                required
-              />
-            </div>
+            {/* <div className="flex-1"> */}
+            {/*   <label className="block text-sm font-medium text-gray-700 mb-1">Project Price ($)</label> */}
+            {/*   <input */}
+            {/*     type="number" */}
+            {/*     value={projectPrice} */}
+            {/*     placeholder="Project Price" */}
+            {/*     onChange={(e) => setProjectPrice(e.target.value)} */}
+            {/*     className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500" */}
+            {/*     required */}
+            {/*   /> */}
+            {/* </div> */}
 
             <label className="block text-sm font-medium text-gray-700 mb-1">Description</label>
             <textarea

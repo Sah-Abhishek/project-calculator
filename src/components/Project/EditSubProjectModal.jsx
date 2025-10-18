@@ -10,6 +10,7 @@ const EditSubProjectModal = ({ isOpen, onClose, project, subProject, allProjects
   const [status, setStatus] = useState('Active');
   const [description, setDescription] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [subProjectPrice, setSubProjectPrice] = useState();
   // console.log("This is the parent project name: ", project._id);
 
   useEffect(() => {
@@ -18,6 +19,7 @@ const EditSubProjectModal = ({ isOpen, onClose, project, subProject, allProjects
       setParentProjectId(project?._id || '');
       setStatus(subProject.status || 'Active');
       setDescription(subProject.description || '');
+      setSubProjectPrice(subProject.flatrate || 0);
     }
   }, [subProject]);
 
@@ -29,7 +31,8 @@ const EditSubProjectModal = ({ isOpen, onClose, project, subProject, allProjects
       name,
       parentProjectId,
       status,
-      description
+      description,
+      subProjectPrice
     };
 
     try {
@@ -104,6 +107,17 @@ const EditSubProjectModal = ({ isOpen, onClose, project, subProject, allProjects
               <option value="Inactive">Inactive</option>
             </select>
           </div>
+          <div className="flex-1">
+            <label className="block text-sm font-medium text-gray-700 mb-1">Sub-Project Price</label>
+            <input
+              type="Number"
+              value={subProjectPrice}
+              onChange={(e) => setSubProjectPrice(e.target.value)}
+              className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              required
+            />
+          </div>
+
 
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Description</label>

@@ -10,6 +10,7 @@ const CreateSubProjectModal = ({ isOpen, onClose, refreshProjects }) => {
   const [desc, setDesc] = useState('');
   const [selectedParentProjectId, setSelectedParentProjectId] = useState('');
   const [subProjectName, setSubProjectName] = useState('');
+  const [subProjectPrice, setSubProjectPrice] = useState(0);
 
   const fetchAllProjects = async () => {
     try {
@@ -32,7 +33,7 @@ const CreateSubProjectModal = ({ isOpen, onClose, refreshProjects }) => {
 
     try {
       // console.log("This is the selectedParentProjectId insinde the create subproject modal: ", selectedParentProjectId);
-      const { data, status } = await createSubProject(subProjectName, selectedParentProjectId, desc);
+      const { data, status } = await createSubProject(subProjectName, subProjectPrice, selectedParentProjectId, desc);
       if (status === 201) {
         await refreshProjects();
         onClose();
@@ -85,6 +86,18 @@ const CreateSubProjectModal = ({ isOpen, onClose, refreshProjects }) => {
             </div>
 
           </div>
+          <div className="flex-1">
+            <label className="block text-sm font-medium text-gray-700 mb-1">Project Price ($)</label>
+            <input
+              type="number"
+              value={subProjectPrice}
+              placeholder="Project Price"
+              onChange={(e) => setSubProjectPrice(e.target.value)}
+              className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              required
+            />
+          </div>
+
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Description</label>
             <textarea

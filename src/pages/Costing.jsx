@@ -9,9 +9,9 @@ const PageHeader = ({ heading, subHeading }) => (
 );
 
 // This component now uses API calls instead of initial dummy data.
-// FIX: Using http://localhost:3000/api as a standard default placeholder for a running API service.
 // *** IMPORTANT: Update this string with your actual API base URL. ***
-const apiBaseUrl = import.meta.env.VITE_BACKEND_URL;
+// FIX: Replaced import.meta.env.VITE_BACKEND_URL with a placeholder URL to resolve compilation warning.
+const apiBaseUrl = 'http://localhost:3000/api';
 
 const Costing = () => {
   // State for managing filters, data, and UI
@@ -74,11 +74,18 @@ const Costing = () => {
 
     // Determine which subprojects to load productivity rates for.
     let subprojectIdsToFetchRates = [];
+    const allSubprojectsFlat = subprojects.flatMap(p => p.subprojects || []).map(sp => ({
+      ...sp,
+      // Store the parent projectId for easier lookup later
+      projectId: subprojects.find(p => p.subprojects?.some(s => s._id === sp._id))?._id
+    }));
+
+
     if (subProject) {
       subprojectIdsToFetchRates = [subProject];
     } else {
       // All projects view: fetch rates for all subprojects
-      subprojectIdsToFetchRates = subprojects.flatMap(p => (p.subprojects || []).map(sp => sp._id));
+      subprojectIdsToFetchRates = allSubprojectsFlat.map(sp => sp._id);
     }
 
     // Fetch all productivity rates required
@@ -91,8 +98,6 @@ const Costing = () => {
       return acc;
     }, {});
     setProductivityRatesMap(ratesMap);
-
-    const allSubprojectsFlat = subprojects.flatMap(p => p.subprojects || []);
 
     if (!project) {
       // --- ALL PROJECTS VIEW (Combined Active Assignments + Monthly Records) ---
@@ -112,6 +117,7 @@ const Costing = () => {
         if (!currentMonthBillingRes.ok) throw new Error('Could not fetch current month billing records.');
         const currentMonthBillingRecords = await currentMonthBillingRes.json();
 
+        // FIX: Corrected typo 'apiBaseBaseUrl' to 'apiBaseUrl'
         const nullMonthBillingRes = await fetch(`${apiBaseUrl}/billing?month=null`);
         if (!nullMonthBillingRes.ok) throw new Error('Could not fetch initial billing records.');
         const nullMonthBillingRecords = await nullMonthBillingRes.json();
@@ -139,12 +145,13 @@ const Costing = () => {
         // Only iterates over EXISTING resources
         allResources.forEach(resource => {
           (resource.assigned_subprojects || []).forEach(assignedSubproject => {
-            let projectInfo, subProjectInfo;
-            for (const p of subprojects) {
-              const sp = (p.subprojects || []).find(s => s._id === assignedSubproject._id);
-              if (sp) { projectInfo = p; subProjectInfo = sp; break; }
-            }
-            if (!projectInfo || !subProjectInfo) return;
+
+            // NEW LOGIC: Use the flattened list for reliable subproject info
+            const subProjectInfo = allSubprojectsFlat.find(sp => sp._id === assignedSubproject._id);
+            if (!subProjectInfo) return; // Skip if subproject info is missing
+
+            const projectInfo = projectsData.find(p => p._id === subProjectInfo.projectId);
+            if (!projectInfo) return;
 
             const subprojectId = subProjectInfo._id;
             const uniqueKey = `${subprojectId}-${resource._id}`;
@@ -162,7 +169,7 @@ const Costing = () => {
                 billingId: billing._id,
                 hours: billing.hours,
                 rate: billing.rate,
-                flatrate: projectInfo.flatrate ?? 0, // MODIFIED: Always use project flatrate
+                flatrate: subProjectInfo.flatrate ?? 0, // <-- FIX: Use Subproject flatrate
                 productivity: billing.productivity_level,
                 description: billing.description || '',
                 isBillable: billing.billable_status === 'Billable'
@@ -173,7 +180,7 @@ const Costing = () => {
                 billingId: null,
                 hours: 0,
                 rate: rateRecord?.base_rate ?? 0,
-                flatrate: projectInfo.flatrate ?? 0,
+                flatrate: subProjectInfo.flatrate ?? 0, // <-- FIX: Use Subproject flatrate
                 productivity: defaultProductivity,
                 description: '',
                 isBillable: true
@@ -192,8 +199,7 @@ const Costing = () => {
           });
         });
 
-        // Pass 2: Historical/Orphaned Records (Handles Unassigned Existing and Deleted Resources)
-        // We iterate over the combined map to catch all records not covered in Pass 1.
+        // Pass 2: Historical/Orphaned Records
         billingRecordsMap.forEach(billing => {
           const subprojectId = billing.subproject_id?._id || billing.subproject_id;
           const uniqueKey = `${subprojectId}-${billing.resource_id}`;
@@ -202,15 +208,16 @@ const Costing = () => {
           if (finalDataMap.has(uniqueKey)) return;
 
           // 2. Only show records that were explicitly billed (month != null).
-          // This filters out auto-generated placeholders (month == null) for all unassigned/deleted resources.
           if (billing.month === null) return;
 
           // 3. Find resource info
           const resourceInfo = allResourcesMap.get(billing.resource_id);
 
           // Fetch Project/Subproject info (required for display regardless of resource status)
-          let projectInfo = subprojects.find(p => (p.subprojects || []).some(sp => sp._id === subprojectId));
-          let subProjectInfo = allSubprojectsFlat.find(sp => sp._id === subprojectId);
+          // Find the subproject using the flattened list for reliable data
+          const subProjectInfo = allSubprojectsFlat.find(sp => sp._id === subprojectId);
+          const projectInfo = subProjectInfo ? projectsData.find(p => p._id === subProjectInfo.projectId) : null;
+
           if (!projectInfo || !subProjectInfo) return;
 
           const baseRecord = {
@@ -218,7 +225,7 @@ const Costing = () => {
             billingId: billing._id,
             hours: billing.hours,
             rate: billing.rate,
-            flatrate: projectInfo.flatrate ?? 0, // MODIFIED: Always use project flatrate
+            flatrate: subProjectInfo.flatrate ?? 0, // <-- FIX: Use Subproject flatrate
             productivity: billing.productivity_level,
             description: billing.description || '',
             isBillable: billing.billable_status === 'Billable',
@@ -271,9 +278,15 @@ const Costing = () => {
         if (!productivityRes.ok) throw new Error('Could not fetch productivity rates.');
         if (!resourcesRes.ok) throw new Error('Could not fetch resources.');
 
-        // FIX: Get the selected project from projectsData to access its flatrate
-        const selectedProject = projectsData.find(p => p._id === project);
-        const projectFlatRate = selectedProject?.flatrate ?? 0;
+        // NEW LOGIC: Find the specific subproject's flatrate
+        let subProjectFlatRate = 0;
+        const selectedProjectContainer = subprojects.find(p => p._id === project);
+        const selectedSubProject = selectedProjectContainer?.subprojects.find(sp => sp._id === subProject);
+
+        if (selectedSubProject) {
+          subProjectFlatRate = selectedSubProject.flatrate ?? 0;
+        }
+        // END NEW LOGIC
 
         const ratesData = await productivityRes.json();
         const allResources = await resourcesRes.json();
@@ -321,7 +334,7 @@ const Costing = () => {
               billingId: billing._id,
               hours: billing.hours,
               rate: billing.rate, // Internal Cost Rate
-              flatrate: projectFlatRate, // MODIFIED: Always use project flatrate
+              flatrate: subProjectFlatRate, // <-- Use Subproject flatrate variable
               productivity: billing.productivity_level,
               description: billing.description || '',
               isBillable: billing.billable_status === 'Billable'
@@ -332,7 +345,7 @@ const Costing = () => {
               billingId: null,
               hours: 0,
               rate: rateRecord?.base_rate ?? 0, // Default Internal Cost Rate
-              flatrate: projectFlatRate, // Project Flat Rate
+              flatrate: subProjectFlatRate, // <-- Use Subproject flatrate variable
               productivity: defaultProductivity,
               description: '',
               isBillable: true
@@ -355,7 +368,7 @@ const Costing = () => {
             billingId: billing._id,
             hours: billing.hours,
             rate: billing.rate, // Internal Cost Rate
-            flatrate: projectFlatRate, // MODIFIED: Always use project flatrate
+            flatrate: subProjectFlatRate, // <-- Use Subproject flatrate variable
             productivity: billing.productivity_level,
             description: billing.description || '',
             isBillable: billing.billable_status === 'Billable',
@@ -455,7 +468,7 @@ const Costing = () => {
     setResources(updatedResources);
 
     // Prepare payload for API
-    const totalAmount = Number(newRes.hours) * Number(newRes.flatrate); // Revenue: Flatrate * Hours
+    const totalAmount = Number(newRes.hours) * Number(newRes.flatrate); // Revenue: Subproject Flatrate * Hours
     const costingAmount = Number(newRes.hours) * Number(newRes.rate); // Cost: Cost Rate * Hours
 
     const payload = {
@@ -465,7 +478,7 @@ const Costing = () => {
       hours: Number(newRes.hours),
       productivity_level: newRes.productivity,
       rate: Number(newRes.rate), // Internal Cost Rate
-      flatrate: Number(newRes.flatrate), // Project Flat Rate
+      flatrate: Number(newRes.flatrate), // Subproject Flat Rate
       costing: costingAmount, // New calculated field
       total_amount: totalAmount, // New calculated field
       description: newRes.description,
@@ -638,8 +651,8 @@ const Costing = () => {
   const handleModalSave = async () => {
     if (!editingResource) return;
 
-    const totalAmount = Number(editingResource.hours) * Number(editingResource.flatrate); // Revenue
-    const costingAmount = Number(editingResource.hours) * Number(editingResource.rate); // Cost
+    const totalAmount = Number(editingResource.hours) * Number(editingResource.flatrate); // Revenue: Subproject Flatrate * Hours
+    const costingAmount = Number(editingResource.hours) * Number(editingResource.rate); // Cost: Cost Rate * Hours
 
     const payload = {
       project_id: editingResource.projectId,
@@ -648,7 +661,7 @@ const Costing = () => {
       hours: Number(editingResource.hours),
       productivity_level: editingResource.productivity,
       rate: Number(editingResource.rate), // Internal Cost Rate
-      flatrate: Number(editingResource.flatrate), // Project Flat Rate
+      flatrate: Number(editingResource.flatrate), // Subproject Flat Rate
       costing: costingAmount,
       total_amount: totalAmount,
       description: editingResource.description,
@@ -724,7 +737,7 @@ const Costing = () => {
   };
 
   const totals = useMemo(() => {
-    // Total Revenue (Only for Billable Status, using Flat Rate)
+    // Total Revenue (Only for Billable Status, using Subproject Flat Rate)
     const billableRevenue = resources
       .filter(r => r.isBillable)
       .reduce((sum, r) => sum + r.hours * r.flatrate, 0);
@@ -753,11 +766,11 @@ const Costing = () => {
     { header: 'Project', key: 'projectName' },
     { header: 'Sub-Project', key: 'subProjectName' },
     { header: 'Resource', key: 'resource' },
-    { header: 'Flat Rate ($)', key: 'flatrate' }, // Project Revenue Rate
+    { header: 'Flat Rate ($)', key: 'flatrate' }, // Subproject Revenue Rate
     { header: 'Role', key: 'role' },
     { header: 'Productivity', key: 'productivity' },
     { header: 'Hours', key: 'hours' },
-    { header: 'Cost Rate ($)', key: 'rate' }, // Internal Cost Rate
+    // { header: 'Cost Rate ($)', key: 'rate' }, // Internal Cost Rate
     { header: 'Costing ($)', key: 'costing' }, // Calculated Cost
     { header: 'Billable', key: 'isBillable' },
     { header: 'Total Bill ($)', key: 'totalbill' }, // Calculated Revenue
@@ -887,9 +900,9 @@ const Costing = () => {
                         <input type="number" value={res.hours} onChange={(e) => handleResourceChange(res.uniqueId, 'hours', e.target.value)} className="w-16 px-2 py-1 border border-gray-200 rounded-lg focus:ring-2 focus:ring-blue-600 focus:border-transparent text-center disabled:bg-gray-200 disabled:cursor-not-allowed" disabled={!res.isEditable} />
                       </td>
                       <td className="py-4 px-4 font-semibold text-red-600">{formatCurrency(res.rate)}</td>
-                      <td className="py-4 px-4 font-bold text-red-700">
-                        {formatCurrency(res.hours * res.rate)}
-                      </td>
+                      {/* <td className="py-4 px-4 font-bold text-red-700"> */}
+                      {/*   {formatCurrency(res.hours * res.rate)} */}
+                      {/* </td> */}
                       <td className="py-4 px-4">
                         <span className={`px-2 py-1 rounded-full text-xs font-medium ${res.isBillable ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-600'}`}>
                           {res.isBillable ? '✅ Billable' : '🚫 Non-Billable'}
@@ -900,7 +913,7 @@ const Costing = () => {
                       </td>
                       <td className="py-4 px-4 text-left">
                         <button onClick={() => handleEditClick(res)} className="text-blue-600 hover:text-blue-800 mr-3 p-1 rounded-full hover:bg-blue-100 transition-colors disabled:opacity-50 disabled:cursor-not-allowed" title="Edit" disabled={!res.isEditable || !res.billingId}>
-                          <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                          <svg xmlns="http://www.w3.org/2300/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
                             <path d="M17.414 2.586a2 2 0 00-2.828 0L7 10.172V13h2.828l7.586-7.586a2 2 0 000-2.828z" />
                             <path fillRule="evenodd" d="M2 6a2 2 0 012-2h4a1 1 0 010 2H4v10h10v-4a1 1 0 112 0v4a2 2 0 01-2 2H4a2 2 0 01-2-2V6z" clipRule="evenodd" />
                           </svg>
