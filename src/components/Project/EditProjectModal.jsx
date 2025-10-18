@@ -80,16 +80,16 @@ const EditProjectModal = ({ isOpen, onClose, project, refreshProjects }) => {
             </div>
           </div>
 
-          <div className="flex-1">
-            <label className="block text-sm font-medium text-gray-700 mb-1">Project Price</label>
-            <input
-              type="Number"
-              value={projectPrice}
-              onChange={(e) => setProjectPrice(e.target.value)}
-              className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
-              required
-            />
-          </div>
+          {/* <div className="flex-1"> */}
+          {/*   <label className="block text-sm font-medium text-gray-700 mb-1">Project Price</label> */}
+          {/*   <input */}
+          {/*     type="Number" */}
+          {/*     value={projectPrice} */}
+          {/*     onChange={(e) => setProjectPrice(e.target.value)} */}
+          {/*     className="w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500" */}
+          {/*     required */}
+          {/*   /> */}
+          {/* </div> */}
 
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Description</label>
