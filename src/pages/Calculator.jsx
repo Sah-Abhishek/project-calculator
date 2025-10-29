@@ -67,10 +67,13 @@ const Calculator = () => {
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mt-6">
           <Card title="Total Projects" value={stats.totalProjects} />
           <Card title="Total Resources" value={stats.totalResources} />
-          <Card title="Billable Resources" value={stats.billableResources} />
+          {/* <Card title="Billable Resources" value={stats.billableResources} /> */}
+          <Card title="Current Month Costing"
+            value={`$${stats.currentMonthBilling.toFixed(2)}`}
+          />
           <Card
             title="Current Month Billing"
-            value={`$${stats.currentMonthBilling.toFixed(2)}`}
+            value={`$${stats.currentMonthCosting?.toFixed(2)}`}
           />
         </div>
       </div>
@@ -78,7 +81,7 @@ const Calculator = () => {
       {/* Tabs */}
       <div className="px-6">
         <div className="flex space-x-4 border-b border-gray-200 mb-4">
-          {[ "Monthly Budget Analysis", "Project Cost Estimation", "Resource Allocation Analysis"].map((tab) => (
+          {["Monthly Budget Analysis", "Project Cost Estimation", "Resource Allocation Analysis"].map((tab) => (
             <button
               key={tab}
               className={`py-2 px-4 text-sm font-medium border-b-2 transition ${activeTab === tab

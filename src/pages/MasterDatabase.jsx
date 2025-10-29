@@ -19,7 +19,7 @@ const tabs = [
   { id: "sub-projects", label: "Sub-Projects", icon: <FaFolderOpen /> },
   { id: "resources", label: "Resources", icon: <FaUsers /> },
   { id: "productivity", label: "Productivity", icon: <FaBolt /> },
-  { id: "billing", label: "Billing", icon: <FaMoneyBillWave /> },
+  { id: "billing", label: "Costing", icon: <FaMoneyBillWave /> },
 ];
 
 const MasterDatabase = () => {

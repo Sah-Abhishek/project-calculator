@@ -103,7 +103,7 @@ const ProductivityContent = () => {
                   </span>
                 </td>
                 <td className="px-6 py-4 text-right font-semibold text-gray-900">
-                  ₹{tier.rate}
+                  ${tier.rate}
                 </td>
               </tr>
             ))}

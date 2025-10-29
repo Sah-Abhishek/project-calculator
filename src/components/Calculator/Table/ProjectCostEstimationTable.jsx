@@ -86,15 +86,15 @@ const ProjectCostEstimationTable = ({ data = {} }) => {
                   <td className="py-3 px-4">{item.productivity_level || "—"}</td>
                   <td className="py-3 px-4 text-center">{item.hours || 0}</td>
                   <td className="py-3 px-4 text-center">
-                    ₹{Number(item.rate || 0).toLocaleString()}
+                    ${Number(item.rate || 0).toLocaleString()}
                   </td>
                   <td className="py-3 px-4 text-center">
-                    ₹{Number(item.cost || 0).toLocaleString()}
+                    ${Number(item.cost || 0).toLocaleString()}
                   </td>
                   <td
                     className={`py-3 px-4 text-center font-medium ${item.billable_status === "Billable"
-                        ? "text-green-600"
-                        : "text-gray-600"
+                      ? "text-green-600"
+                      : "text-gray-600"
                       }`}
                   >
                     {item.billable_status || "—"}

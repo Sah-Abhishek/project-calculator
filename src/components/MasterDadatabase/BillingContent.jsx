@@ -81,13 +81,13 @@ const BillingContent = () => {
       <div className="p-5 border-b border-gray-200 flex flex-col sm:flex-row justify-between gap-3 bg-gray-50">
         <div>
           <h2 className="text-xl font-semibold text-gray-800">
-            Billing Summary
+            Costing Summary
           </h2>
           <p className="text-sm text-gray-500">Filtered by month and year</p>
         </div>
 
         {/* Right Side Filters */}
-        <div className="flex flex-col sm:flex-row items-center gap-3 w-full sm:w-auto">
+        <div className="flex flex-col sm:flex-row  items-center gap-3 w-full sm:w-auto">
           {/* Fancy Dropdown for Month */}
           <div className="w-full sm:w-52">
             <FancyDropdown
@@ -99,7 +99,7 @@ const BillingContent = () => {
           </div>
 
           {/* Search Bar */}
-          <div className="relative w-full sm:w-72">
+          <div className="relative mt-6 w-full sm:w-72">
             <input
               type="text"
               value={search}
@@ -171,10 +171,10 @@ const BillingContent = () => {
                     {bill.hours}
                   </td>
                   <td className="px-6 py-4 text-right text-gray-700">
-                    ₹{bill.rate}
+                    ${bill.rate}
                   </td>
                   <td className="px-6 py-4 text-right font-semibold text-gray-900">
-                    ₹{bill.total_amount}
+                    ${bill.total_amount}
                   </td>
                   <td className="px-6 py-4 text-center">
                     <span
