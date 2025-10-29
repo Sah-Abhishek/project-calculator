@@ -10,8 +10,7 @@ const PageHeader = ({ heading, subHeading }) => (
 
 // This component now uses API calls instead of initial dummy data.
 // *** IMPORTANT: Update this string with your actual API base URL. ***
-// FIX: Replaced import.meta.env.VITE_BACKEND_URL with a placeholder URL to resolve compilation warning.
-const apiBaseUrl = import.meta.env.VITE_API_URL;
+const apiBaseUrl = import.meta.env.VITE_BACKEND_URL;
 
 const Costing = () => {
   // State for managing filters, data, and UI
