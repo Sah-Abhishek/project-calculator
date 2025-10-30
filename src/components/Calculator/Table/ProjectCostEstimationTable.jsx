@@ -49,7 +49,7 @@ const ProjectCostEstimationTable = ({ data = {} }) => {
         </div>
 
         <div className="bg-purple-50 p-4 rounded-xl border border-purple-100">
-          <p className="text-sm text-gray-500">Total Cost</p>
+          <p className="text-sm text-gray-500">Total Billing</p>
           <p className="font-semibold text-gray-800">
             ₹{Number(total_cost).toLocaleString()}
           </p>
@@ -89,7 +89,7 @@ const ProjectCostEstimationTable = ({ data = {} }) => {
                     ${Number(item.rate || 0).toLocaleString()}
                   </td>
                   <td className="py-3 px-4 text-center">
-                    ${Number(item.cost || 0).toLocaleString()}
+                    ${Number(item.costing || 0).toLocaleString()}
                   </td>
                   <td
                     className={`py-3 px-4 text-center font-medium ${item.billable_status === "Billable"

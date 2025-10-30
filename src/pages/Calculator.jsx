@@ -68,11 +68,11 @@ const Calculator = () => {
           <Card title="Total Projects" value={stats.totalProjects} />
           <Card title="Total Resources" value={stats.totalResources} />
           {/* <Card title="Billable Resources" value={stats.billableResources} /> */}
-          <Card title="Current Month Costing"
+          <Card title="Current Month Budget"
             value={`$${stats.currentMonthBilling.toFixed(2)}`}
           />
           <Card
-            title="Current Month Billing"
+            title="Current Month Costing"
             value={`$${stats.currentMonthCosting?.toFixed(2)}`}
           />
         </div>

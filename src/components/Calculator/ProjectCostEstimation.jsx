@@ -48,7 +48,7 @@ const ProjectCostEstimation = () => {
     ].map((m) => `${m} ${currentYear}`);
 
     // Add "All Months" at top
-    return ["All Months", ...baseMonths];
+    return [...baseMonths];
   }, []);
 
   // Helpers to get IDs
